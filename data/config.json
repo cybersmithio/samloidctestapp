@@ -1,0 +1,25 @@
+{
+  "identityProviders": [
+    {
+      "protocol": "saml20",
+      "name": "Example SAML IdP",
+      "loginUrl": "https://idp.example.com/sso/saml",
+      "logoutUrl": "https://idp.example.com/sso/logout",
+      "certificate": "saml-idp-cert.pem"
+    },
+    {
+      "protocol": "oidc",
+      "name": "Example OIDC IdP",
+      "tenantUrl": "https://login.example.com/tenant-id",
+      "issuerUrl": "https://login.example.com/tenant-id/v2.0",
+      "authorizationUrl": "https://login.example.com/tenant-id/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.example.com/tenant-id/oauth2/v2.0/token",
+      "userInfoUrl": "https://graph.example.com/oidc/userinfo",
+      "metadataUrl": "https://login.example.com/tenant-id/v2.0/.well-known/openid-configuration",
+      "clientId": "your-client-id",
+      "clientSecret": "your-client-secret",
+      "callbackUrl": "http://localhost:3000/auth/oidc/callback",
+      "scope": "openid profile email"
+    }
+  ]
+}
