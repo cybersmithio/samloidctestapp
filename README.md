@@ -3,6 +3,7 @@ This is an application used to test SAML and OIDC authentication.  Code has been
 
 # Requirements
 * An application that has a main page that displays login buttons for a user to log in using one of the configure identify providers.
+* The application can use React javascript framework.
 * A protected page that can only be accessed when the user provides a valid access credential.
 * Valid access credentials include valid SAML assertions or JWT tokens.
 * The protected page should display the information contained in the access credential provide by the user.
