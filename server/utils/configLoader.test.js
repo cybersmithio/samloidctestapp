@@ -31,7 +31,6 @@ describe('configLoader', () => {
             metadataUrl: 'https://login.example.com/.well-known',
             clientId: 'client123',
             clientSecret: 'secret123',
-            callbackUrl: 'http://localhost:3000/callback',
             scope: 'openid profile email'
           }
         ]

@@ -48,7 +48,7 @@ function validateSamlConfig(idp, index) {
 
 function validateOidcConfig(idp, index) {
   const required = ['tenantUrl', 'issuerUrl', 'authorizationUrl', 'tokenUrl',
-                    'clientId', 'clientSecret', 'callbackUrl', 'scope'];
+                    'clientId', 'clientSecret', 'scope'];
   required.forEach(field => {
     if (!idp[field]) {
       throw new Error(`Missing ${field} for OIDC IdP at index ${index}`);

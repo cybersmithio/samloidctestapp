@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test SAML Assertion Endpoint</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .info {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            margin-bottom: 20px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin-bottom: 20px;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test SAML Assertion Endpoint</h1>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This is a test page for development purposes only.
+            <ul>
+                <li>Make sure you have a valid certificate in <code>data/certificates/</code></li>
+                <li>The SAML response must be properly signed by one of the trusted certificates</li>
+                <li>On successful validation, you will be redirected to the protected page</li>
+            </ul>
+        </div>
+
+        <div class="info">
+            <strong>📝 Instructions:</strong>
+            <ol>
+                <li>Paste your base64-encoded SAML response in the textarea below</li>
+                <li>Click "Submit SAML Assertion"</li>
+                <li>If valid, you'll be redirected to <code>/protected</code> with user details</li>
+                <li>If invalid, check the browser console for error details</li>
+            </ol>
+        </div>
+
+        <form action="http://localhost:3001/assert" method="POST">
+            <label for="samlResponse"><strong>SAML Response (Base64 Encoded):</strong></label>
+            <textarea
+                id="samlResponse"
+                name="SAMLResponse"
+                placeholder="Paste your base64-encoded SAML response here...&#10;&#10;Example:&#10;PD94bWwgdmVyc2lvbj0iMS4wIj8+PHNhbWxwOlJlc3BvbnNlIC4uLg=="
+                required
+            ></textarea>
+
+            <button type="submit">Submit SAML Assertion</button>
+        </form>
+
+        <div class="info" style="margin-top: 30px;">
+            <strong>📚 Sample SAML Response Structure:</strong>
+            <pre style="background: #f8f9fa; padding: 10px; overflow-x: auto; font-size: 11px;">
+&lt;?xml version="1.0"?&gt;
+&lt;samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                ID="_response123"
+                Version="2.0"
+                IssueInstant="2025-10-10T12:00:00Z"&gt;
+  &lt;saml:Issuer&gt;http://idp.example.com&lt;/saml:Issuer&gt;
+  &lt;samlp:Status&gt;
+    &lt;samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/&gt;
+  &lt;/samlp:Status&gt;
+  &lt;saml:Assertion ID="_assertion456" Version="2.0"&gt;
+    &lt;ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"&gt;
+      &lt;!-- Digital signature --&gt;
+    &lt;/ds:Signature&gt;
+    &lt;saml:Subject&gt;
+      &lt;saml:NameID&gt;user@example.com&lt;/saml:NameID&gt;
+    &lt;/saml:Subject&gt;
+    &lt;saml:AttributeStatement&gt;
+      &lt;saml:Attribute Name="email"&gt;
+        &lt;saml:AttributeValue&gt;user@example.com&lt;/saml:AttributeValue&gt;
+      &lt;/saml:Attribute&gt;
+    &lt;/saml:AttributeStatement&gt;
+  &lt;/saml:Assertion&gt;
+&lt;/samlp:Response&gt;
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        // Add form submission handling to show loading state
+        document.querySelector('form').addEventListener('submit', function() {
+            const button = document.querySelector('button');
+            button.textContent = 'Validating...';
+            button.disabled = true;
+        });
+    </script>
+</body>
+</html>

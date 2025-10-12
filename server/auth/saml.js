@@ -1,6 +1,9 @@
 const express = require('express');
 const { parseString } = require('xml2js');
 const { SignedXml } = require('xml-crypto');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const configLoader = require('../utils/configLoader');
 
 const router = express.Router();
@@ -8,26 +11,62 @@ const router = express.Router();
 function createSamlRouter(config) {
   // SAML login initiation
   router.get('/login', (req, res) => {
-    const idpName = req.query.idp;
-    const idp = config.identityProviders.find(
-      i => i.protocol === 'saml20' && i.name === idpName
-    );
+    try {
+      const idpName = req.query.idp;
+      const idp = config.identityProviders.find(
+        i => i.protocol === 'saml20' && i.name === idpName
+      );
 
-    if (!idp) {
-      return res.status(404).json({ error: 'Identity provider not found' });
+      if (!idp) {
+        return res.status(404).json({ error: 'Identity provider not found' });
+      }
+
+      // Store IdP info in session for callback
+      req.session.pendingIdp = {
+        name: idp.name,
+        protocol: 'saml20',
+        certificate: idp.certificate
+      };
+
+      // Generate SAML AuthnRequest
+      const appConfig = config.application || {
+        entityId: `${req.protocol}://${req.get('host')}/saml/metadata`,
+        baseUrl: `${req.protocol}://${req.get('host')}`
+      };
+
+      const acsUrl = `${appConfig.baseUrl}/assert`;
+      const requestId = '_' + crypto.randomBytes(16).toString('hex');
+      const issueInstant = new Date().toISOString();
+
+      // Store request ID in session for validation
+      req.session.samlRequestId = requestId;
+
+      // Generate the SAML AuthnRequest XML
+      const authnRequest = generateAuthnRequest({
+        requestId,
+        issueInstant,
+        destination: idp.loginUrl,
+        entityId: appConfig.entityId,
+        acsUrl,
+        //signRequest: appConfig.signSamlRequests || false,
+        //certificate: appConfig.samlSigningCertificate,
+        //privateKey: appConfig.samlSigningPrivateKey
+      });
+
+      // Base64 encode the request
+      const samlRequest = Buffer.from(authnRequest).toString('base64');
+
+      // Build redirect URL
+      const redirectUrl = new URL(idp.loginUrl);
+      redirectUrl.searchParams.append('SAMLRequest', samlRequest);
+      redirectUrl.searchParams.append('RelayState', req.sessionID);
+
+      // Redirect to IdP
+      res.redirect(redirectUrl.toString());
+    } catch (error) {
+      console.error('SAML login error:', error);
+      res.status(500).json({ error: 'Failed to initiate SAML login', details: error.message });
     }
-
-    // Store IdP info in session for callback
-    req.session.pendingIdp = {
-      name: idp.name,
-      protocol: 'saml20',
-      certificate: idp.certificate
-    };
-
-    // In a real implementation, you would generate a SAML AuthnRequest
-    // and redirect to the IdP's login URL
-    // For testing, we'll redirect to a callback with mock data
-    res.redirect(`${idp.loginUrl}?RelayState=${encodeURIComponent(req.sessionID)}`);
   });
 
   // SAML assertion consumer service (callback)
@@ -199,6 +238,103 @@ async function parseSamlAssertion(samlXml) {
       }
     });
   });
+}
+
+function generateAuthnRequest(options) {
+  const {
+    requestId,
+    issueInstant,
+    destination,
+    entityId,
+    acsUrl,
+    signRequest,
+    certificate,
+    privateKey
+  } = options;
+
+  // Build the SAML AuthnRequest XML with only essential elements
+  let authnRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                    ID="${requestId}"
+                    Version="2.0"
+                    IssueInstant="${issueInstant}"
+                    Destination="${destination}"
+                    AssertionConsumerServiceURL="${acsUrl}"
+                    ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+  <saml:Issuer>${entityId}</saml:Issuer>
+  <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/>
+  <samlp:RequestedAuthnContext Comparison="exact">
+    <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>
+  </samlp:RequestedAuthnContext>
+</samlp:AuthnRequest>`;
+
+  // Sign the request if signing is enabled
+  if (signRequest && certificate && privateKey) {
+    try {
+      authnRequest = signAuthnRequest(authnRequest, certificate, privateKey);
+    } catch (error) {
+      console.warn('Failed to sign SAML AuthnRequest:', error.message);
+      // Continue with unsigned request
+    }
+  }
+
+  return authnRequest;
+}
+
+function signAuthnRequest(xml, certificatePath, privateKeyPath) {
+  // Load the private key and certificate
+  const keyPath = path.join(__dirname, '../../data', privateKeyPath);
+  const certPath = path.join(__dirname, '../../data', certificatePath);
+
+  if (!fs.existsSync(keyPath)) {
+    throw new Error(`Private key file not found: ${keyPath}`);
+  }
+  if (!fs.existsSync(certPath)) {
+    throw new Error(`Certificate file not found: ${certPath}`);
+  }
+
+  const privateKey = fs.readFileSync(keyPath, 'utf8');
+  const certificate = fs.readFileSync(certPath, 'utf8');
+
+  // Validate that we actually read the key
+  if (!privateKey || !privateKey.includes('PRIVATE KEY')) {
+    throw new Error('Invalid private key format');
+  }
+
+  // Extract certificate content (remove BEGIN/END lines)
+  const certContent = certificate
+    .replace(/-----BEGIN CERTIFICATE-----/g, '')
+    .replace(/-----END CERTIFICATE-----/g, '')
+    .replace(/\s/g, '');
+
+  // Create signature using xml-crypto with options
+  const sig = new SignedXml({
+    privateKey: privateKey,
+    signatureAlgorithm: 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+    canonicalizationAlgorithm: 'http://www.w3.org/2001/10/xml-exc-c14n#'
+  });
+
+  // Set key info provider
+  sig.keyInfoProvider = {
+    getKeyInfo: () => {
+      return `<X509Data><X509Certificate>${certContent}</X509Certificate></X509Data>`;
+    }
+  };
+
+  // Add reference to the root element with transforms and digest method
+  sig.addReference({
+    xpath: "//*[local-name(.)='AuthnRequest']",
+    transforms: ['http://www.w3.org/2000/09/xmldsig#enveloped-signature', 'http://www.w3.org/2001/10/xml-exc-c14n#'],
+    digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256'
+  });
+
+  // Compute and embed signature
+  sig.computeSignature(xml, {
+    location: { reference: "//*[local-name(.)='Issuer']", action: 'after' }
+  });
+
+  return sig.getSignedXml();
 }
 
 module.exports = createSamlRouter;

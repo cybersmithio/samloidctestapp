@@ -21,4 +21,28 @@ module.exports = {
       statements: 70,
     },
   },
+  testMatch: [
+    '**/__tests__/**/*.[jt]s?(x)',
+    '**/?(*.)+(spec|test).[jt]s?(x)',
+  ],
+  testEnvironmentOptions: {
+    customExportConditions: ['node', 'node-addons'],
+  },
+  // Use node environment for server tests
+  projects: [
+    {
+      displayName: 'client',
+      testEnvironment: 'jsdom',
+      testMatch: ['<rootDir>/src/**/*.test.js'],
+      setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
+      moduleNameMapper: {
+        '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+      },
+    },
+    {
+      displayName: 'server',
+      testEnvironment: 'node',
+      testMatch: ['<rootDir>/server/**/*.test.js'],
+    },
+  ],
 };

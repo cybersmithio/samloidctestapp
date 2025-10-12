@@ -9,6 +9,8 @@ node_modules/
 # Production
 /build
 
+
+
 # Misc
 .DS_Store
 .env
@@ -23,11 +25,21 @@ yarn-error.log*
 
 # Certificates (security)
 data/certificates/*.pem
+data/certificates/*.cer
 data/certificates/*.crt
 data/certificates/*.key
 
 # But keep the README
 !data/certificates/README.md
+
+# Service Provider private keys and certificates
+data/certsAndKeys/*.pem
+data/certsAndKeys/*.key
+data/certsAndKeys/*.crt
+
+# But keep the README and config
+!data/certsAndKeys/README.md
+!data/certsAndKeys/*.cnf
 
 # IDE
 .vscode/

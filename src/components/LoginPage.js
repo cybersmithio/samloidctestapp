@@ -18,12 +18,46 @@ function LoginPage() {
   }, []);
 
   const handleLogin = (idp) => {
+    // In development, use full backend URL. In production, use relative URL.
+    const backendUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+
     if (idp.protocol === 'saml20') {
       // Redirect to SAML login endpoint
-      window.location.href = `/auth/saml/login?idp=${encodeURIComponent(idp.name)}`;
+      window.location.href = `${backendUrl}/auth/saml/login?idp=${encodeURIComponent(idp.name)}`;
     } else if (idp.protocol === 'oidc') {
       // Redirect to OIDC login endpoint
-      window.location.href = `/auth/oidc/login?idp=${encodeURIComponent(idp.name)}`;
+      window.location.href = `${backendUrl}/auth/oidc/login?idp=${encodeURIComponent(idp.name)}`;
+    }
+  };
+
+  const handleDownloadMetadata = async () => {
+    try {
+      // Fetch the metadata from the backend
+      const response = await fetch('/saml/metadata');
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch metadata');
+      }
+
+      // Get the XML content as blob
+      const blob = await response.blob();
+
+      // Create a temporary download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'metadata.xml';
+
+      // Trigger the download
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading metadata:', error);
+      setError('Failed to download metadata. Please try again.');
     }
   };
 
@@ -57,6 +91,36 @@ function LoginPage() {
           Loading identity providers...
         </p>
       )}
+
+      <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid #ddd' }}>
+        <h2 style={{ fontSize: '1.2rem', color: '#666', textAlign: 'center', marginBottom: '1rem' }}>
+          Service Provider Metadata
+        </h2>
+        <p style={{ textAlign: 'center', color: '#888', fontSize: '0.9rem', marginBottom: '1rem' }}>
+          Download the SAML metadata file to configure this application as a Service Provider in your Identity Provider
+        </p>
+        <div style={{ textAlign: 'center' }}>
+          <button
+            className="metadata-button"
+            onClick={handleDownloadMetadata}
+            style={{
+              backgroundColor: '#28a745',
+              color: 'white',
+              padding: '12px 24px',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <span style={{ fontSize: '1.2rem' }}>⬇</span>
+            Download SAML Metadata
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

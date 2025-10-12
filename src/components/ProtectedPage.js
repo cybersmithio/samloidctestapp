@@ -67,15 +67,38 @@ function ProtectedPage() {
           <div className="info-section">
             <h2>Authentication Details</h2>
             <p><strong>Protocol:</strong> {credential.protocol}</p>
-            <p><strong>Identity Provider:</strong> {credential.idpName}</p>
-            {credential.user && (
-              <>
-                <p><strong>User ID:</strong> {credential.user.id || credential.user.nameID || 'N/A'}</p>
-                <p><strong>Email:</strong> {credential.user.email || 'N/A'}</p>
-                <p><strong>Name:</strong> {credential.user.name || credential.user.displayName || 'N/A'}</p>
-              </>
+            {credential.idpName && (
+              <p><strong>Identity Provider:</strong> {credential.idpName}</p>
+            )}
+            {credential.verifiedBy && (
+              <p><strong>Verified By Certificate:</strong> {credential.verifiedBy}</p>
+            )}
+            {credential.authenticatedAt && (
+              <p><strong>Authenticated At:</strong> {new Date(credential.authenticatedAt).toLocaleString()}</p>
             )}
           </div>
+
+          {credential.user && (
+            <div className="info-section">
+              <h2>User Information</h2>
+              <p><strong>User ID:</strong> {credential.user.id || credential.user.nameID || 'N/A'}</p>
+              {credential.user.email && (
+                <p><strong>Email:</strong> {credential.user.email}</p>
+              )}
+              {credential.user.name && (
+                <p><strong>Name:</strong> {credential.user.name}</p>
+              )}
+              {credential.user.firstName && (
+                <p><strong>First Name:</strong> {credential.user.firstName}</p>
+              )}
+              {credential.user.lastName && (
+                <p><strong>Last Name:</strong> {credential.user.lastName}</p>
+              )}
+              {credential.user.displayName && (
+                <p><strong>Display Name:</strong> {credential.user.displayName}</p>
+              )}
+            </div>
+          )}
 
           <div className="credential-info">
             <h2>Full Credential Information</h2>

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  saml-oidc-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: saml-oidc-test-app:latest
+    container_name: saml-oidc-app
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      # Add these environment variables as needed
+      # - SESSION_SECRET=your-secret-key-here
+    volumes:
+      # Mount config and certificates for easy updates without rebuilding
+      - ./data:/app/data:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/config', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - saml-oidc-network
+
+networks:
+  saml-oidc-network:
+    driver: bridge
