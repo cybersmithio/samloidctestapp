@@ -43,7 +43,6 @@ Edit `data/config.json` to add your identity providers:
       "metadataUrl": "https://login.provider.com/tenant-id/v2.0/.well-known/openid-configuration",
       "clientId": "your-client-id",
       "clientSecret": "your-client-secret",
-      "callbackUrl": "http://localhost:3000/auth/oidc/callback",
       "scope": "openid profile email"
     }
   ]

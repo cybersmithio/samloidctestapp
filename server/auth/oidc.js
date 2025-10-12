@@ -22,6 +22,10 @@ function createOidcRouter(config) {
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
 
+    // Construct callback URL from application baseUrl
+    const baseUrl = config.application?.baseUrl || `${req.protocol}://${req.get('host')}`;
+    const callbackUrl = `${baseUrl}/auth/oidc/callback`;
+
     // Store state, nonce, and IdP info in session
     req.session.oidcState = state;
     req.session.oidcNonce = nonce;
@@ -35,7 +39,7 @@ function createOidcRouter(config) {
     const authUrl = new URL(idp.authorizationUrl);
     authUrl.searchParams.append('client_id', idp.clientId);
     authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('redirect_uri', idp.callbackUrl);
+    authUrl.searchParams.append('redirect_uri', callbackUrl);
     authUrl.searchParams.append('scope', idp.scope);
     authUrl.searchParams.append('state', state);
     authUrl.searchParams.append('nonce', nonce);
@@ -66,6 +70,10 @@ function createOidcRouter(config) {
 
       const idpConfig = pendingIdp.config;
 
+      // Construct callback URL from application baseUrl
+      const baseUrl = config.application?.baseUrl || `${req.protocol}://${req.get('host')}`;
+      const callbackUrl = `${baseUrl}/auth/oidc/callback`;
+
       // Exchange authorization code for tokens
       const tokenResponse = await fetch(idpConfig.tokenUrl, {
         method: 'POST',
@@ -75,7 +83,7 @@ function createOidcRouter(config) {
         body: new URLSearchParams({
           grant_type: 'authorization_code',
           code: code,
-          redirect_uri: idpConfig.callbackUrl,
+          redirect_uri: callbackUrl,
           client_id: idpConfig.clientId,
           client_secret: idpConfig.clientSecret
         })

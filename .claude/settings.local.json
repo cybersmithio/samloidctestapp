@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(awk:*)",
+      "Bash(xargs:*)",
+      "Bash(npm run start:server:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm start)",
+      "Bash(taskkill:*)",
+      "Bash(findstr:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
