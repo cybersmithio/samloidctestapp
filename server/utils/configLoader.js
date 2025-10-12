@@ -44,6 +44,16 @@ function validateSamlConfig(idp, index) {
       throw new Error(`Missing ${field} for SAML IdP at index ${index}`);
     }
   });
+
+  // Validate binding if provided, default to 'redirect'
+  if (idp.binding && !['redirect', 'post'].includes(idp.binding)) {
+    throw new Error(`Invalid binding for SAML IdP at index ${index}: must be 'redirect' or 'post'`);
+  }
+
+  // Set default binding to 'redirect' if not specified
+  if (!idp.binding) {
+    idp.binding = 'redirect';
+  }
 }
 
 function validateOidcConfig(idp, index) {

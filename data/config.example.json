@@ -11,6 +11,7 @@
     {
       "protocol": "saml20",
       "name": "Example SAML IdP",
+      "binding": "redirect",
       "loginUrl": "https://idp.example.com/sso/saml",
       "logoutUrl": "https://idp.example.com/sso/logout",
       "certificate": "saml-idp-cert.pem"
