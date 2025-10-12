@@ -18,26 +18,9 @@ const app = express();
 const PORT = process.env.PORT || config.application?.port || 3001;
 
 // Middleware
-// Helper function to get protocol based on config
-const getProtocol = () => {
-  return config.application?.useHttps ? 'https' : 'http';
-};
-
-// Helper function to get the frontend dev server URL (only used in development)
-const getFrontendDevUrl = () => {
-  const hostname = config.application?.hostname || 'localhost';
-  const protocol = getProtocol();
-  // In development, React dev server typically runs on port 3000
-  return `${protocol}://${hostname}:3000`;
-};
-
-// Configure CORS based on environment and config
+// Configure CORS - frontend is served by backend on same port
 const getCorsOrigin = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return true;  // In production, allow same-origin requests
-  }
-  // In development, construct React dev server URL from config
-  return getFrontendDevUrl();
+  return true;  // Allow same-origin requests (frontend served by backend)
 };
 
 app.use(cors({
@@ -281,15 +264,8 @@ app.post('/assert', async (req, res) => {
         });
       }
 
-      // Redirect to protected page
-      let redirectUrl;
-      if (process.env.NODE_ENV === 'production') {
-        redirectUrl = '/protected';
-      } else {
-        redirectUrl = `${getFrontendDevUrl()}/protected`;
-      }
-
-      res.redirect(redirectUrl);
+      // Redirect to protected page (frontend is served by backend on same port)
+      res.redirect('/protected');
     });
 
   } catch (error) {

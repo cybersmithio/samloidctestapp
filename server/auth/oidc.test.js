@@ -34,7 +34,6 @@ describe('OIDC Authentication Router', () => {
         metadataUrl: 'https://login.example.com/.well-known/openid-configuration',
         clientId: 'test-client-id',
         clientSecret: 'test-client-secret',
-        callbackUrl: 'http://localhost:3000/auth/oidc/callback',
         scope: 'openid profile email'
       }
     ]
@@ -182,7 +181,8 @@ describe('OIDC Authentication Router', () => {
         });
 
       expect(response.status).toBe(302);
-      expect(response.headers.location).toContain('http://localhost:3000/protected');
+      // Frontend is served by backend on same port, so redirect is relative
+      expect(response.headers.location).toBe('/protected');
     });
 
     test('handles token exchange failure', async () => {
@@ -220,7 +220,8 @@ describe('OIDC Authentication Router', () => {
       const response = await request(app).get('/auth/oidc/logout');
 
       expect(response.status).toBe(302);
-      expect(response.headers.location).toBe('http://localhost:3000');
+      // Frontend is served by backend on same port, so redirect is relative
+      expect(response.headers.location).toBe('/');
     });
   });
 });

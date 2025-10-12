@@ -20,24 +20,13 @@ function LoginPage() {
   }, []);
 
   const handleLogin = (idp) => {
-    // In production, use relative URL (same protocol/host/port as current page)
-    // In development, construct full backend URL using config from the server
-    let backendUrl = '';
-    if (process.env.NODE_ENV !== 'production' && appConfig) {
-      // In development, the React dev server runs on a different port than the backend
-      // Use the protocol from the current page and the backend config
-      const protocol = window.location.protocol; // includes the colon (http: or https:)
-      const hostname = window.location.hostname;
-      const port = appConfig.port || 3001;
-      backendUrl = `${protocol}//${hostname}:${port}`;
-    }
-
+    // Frontend is served by backend on same port, so use relative URLs
     if (idp.protocol === 'saml20') {
       // Redirect to SAML login endpoint
-      window.location.href = `${backendUrl}/auth/saml/login?idp=${encodeURIComponent(idp.name)}`;
+      window.location.href = `/auth/saml/login?idp=${encodeURIComponent(idp.name)}`;
     } else if (idp.protocol === 'oidc') {
       // Redirect to OIDC login endpoint
-      window.location.href = `${backendUrl}/auth/oidc/login?idp=${encodeURIComponent(idp.name)}`;
+      window.location.href = `/auth/oidc/login?idp=${encodeURIComponent(idp.name)}`;
     }
   };
 

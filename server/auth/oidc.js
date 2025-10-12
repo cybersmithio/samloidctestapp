@@ -7,19 +7,6 @@ const configLoader = require('../utils/configLoader');
 const router = express.Router();
 
 function createOidcRouter(config) {
-  // Helper function to get protocol based on config
-  const getProtocol = () => {
-    return config.application?.useHttps ? 'https' : 'http';
-  };
-
-  // Helper function to get the frontend dev server URL (only used in development)
-  const getFrontendDevUrl = () => {
-    const hostname = config.application?.hostname || 'localhost';
-    const protocol = getProtocol();
-    // In development, React dev server typically runs on port 3000
-    return `${protocol}://${hostname}:3000`;
-  };
-
   // OIDC login initiation
   router.get('/login', (req, res) => {
     const idpName = req.query.idp;
@@ -68,11 +55,8 @@ function createOidcRouter(config) {
       // Check for error from IdP
       if (error) {
         console.error('OIDC error:', error, error_description);
-        if (process.env.NODE_ENV === 'production') {
-          return res.redirect(`/?error=${encodeURIComponent(error_description || error)}`);
-        } else {
-          return res.redirect(`${getFrontendDevUrl()}?error=${encodeURIComponent(error_description || error)}`);
-        }
+        // Redirect to home page with error (frontend is served by backend on same port)
+        return res.redirect(`/?error=${encodeURIComponent(error_description || error)}`);
       }
 
       // Verify state parameter
@@ -166,19 +150,12 @@ function createOidcRouter(config) {
       delete req.session.oidcNonce;
       delete req.session.pendingIdp;
 
-      // Redirect to protected page
-      if (process.env.NODE_ENV === 'production') {
-        res.redirect('/protected');
-      } else {
-        res.redirect(`${getFrontendDevUrl()}/protected`);
-      }
+      // Redirect to protected page (frontend is served by backend on same port)
+      res.redirect('/protected');
     } catch (error) {
       console.error('OIDC authentication error:', error);
-      if (process.env.NODE_ENV === 'production') {
-        res.redirect(`/?error=${encodeURIComponent(error.message)}`);
-      } else {
-        res.redirect(`${getFrontendDevUrl()}?error=${encodeURIComponent(error.message)}`);
-      }
+      // Redirect to home page with error (frontend is served by backend on same port)
+      res.redirect(`/?error=${encodeURIComponent(error.message)}`);
     }
   });
 
@@ -188,11 +165,8 @@ function createOidcRouter(config) {
       if (err) {
         console.error('Session destruction error:', err);
       }
-      if (process.env.NODE_ENV === 'production') {
-        res.redirect('/');
-      } else {
-        res.redirect(getFrontendDevUrl());
-      }
+      // Redirect to home page (frontend is served by backend on same port)
+      res.redirect('/');
     });
   });
 

@@ -143,7 +143,8 @@ describe('SAML Authentication Router', () => {
         .send({ SAMLResponse: samlResponse });
 
       expect(response.status).toBe(302);
-      expect(response.headers.location).toContain('http://localhost:3000/protected');
+      // Frontend is served by backend on same port, so redirect is relative
+      expect(response.headers.location).toBe('/protected');
     });
   });
 
