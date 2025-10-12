@@ -21,7 +21,6 @@
   "keywords": ["saml", "oidc", "authentication"],
   "author": "",
   "license": "MIT",
-  "proxy": "http://localhost:3001",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

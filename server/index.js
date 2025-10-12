@@ -17,6 +17,9 @@ const config = configLoader.loadConfig();
 const app = express();
 const PORT = process.env.PORT || config.application?.port || 3001;
 
+// Trust proxy headers - important for correct URL construction in redirects
+app.set('trust proxy', true);
+
 // Middleware
 // Configure CORS - frontend is served by backend on same port
 const getCorsOrigin = () => {
@@ -264,8 +267,13 @@ app.post('/assert', async (req, res) => {
         });
       }
 
-      // Redirect to protected page (frontend is served by backend on same port)
-      res.redirect('/protected');
+      // Construct absolute redirect URL using config
+      const protocol = config.application?.useHttps ? 'https' : 'http';
+      const hostname = config.application?.hostname || req.hostname || 'localhost';
+      const port = PORT;
+      const redirectUrl = `${protocol}://${hostname}:${port}/protected`;
+
+      res.redirect(redirectUrl);
     });
 
   } catch (error) {

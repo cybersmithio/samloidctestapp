@@ -7,6 +7,14 @@ const configLoader = require('../utils/configLoader');
 const router = express.Router();
 
 function createOidcRouter(config) {
+  // Helper function to build absolute URLs from config
+  const buildAbsoluteUrl = (path = '/') => {
+    const protocol = config.application?.useHttps ? 'https' : 'http';
+    const hostname = config.application?.hostname || 'localhost';
+    const port = config.application?.port || 3001;
+    return `${protocol}://${hostname}:${port}${path}`;
+  };
+
   // OIDC login initiation
   router.get('/login', (req, res) => {
     const idpName = req.query.idp;
@@ -55,8 +63,8 @@ function createOidcRouter(config) {
       // Check for error from IdP
       if (error) {
         console.error('OIDC error:', error, error_description);
-        // Redirect to home page with error (frontend is served by backend on same port)
-        return res.redirect(`/?error=${encodeURIComponent(error_description || error)}`);
+        // Redirect to home page with error using absolute URL from config
+        return res.redirect(buildAbsoluteUrl(`/?error=${encodeURIComponent(error_description || error)}`));
       }
 
       // Verify state parameter
@@ -150,12 +158,12 @@ function createOidcRouter(config) {
       delete req.session.oidcNonce;
       delete req.session.pendingIdp;
 
-      // Redirect to protected page (frontend is served by backend on same port)
-      res.redirect('/protected');
+      // Redirect to protected page using absolute URL from config
+      res.redirect(buildAbsoluteUrl('/protected'));
     } catch (error) {
       console.error('OIDC authentication error:', error);
-      // Redirect to home page with error (frontend is served by backend on same port)
-      res.redirect(`/?error=${encodeURIComponent(error.message)}`);
+      // Redirect to home page with error using absolute URL from config
+      res.redirect(buildAbsoluteUrl(`/?error=${encodeURIComponent(error.message)}`));
     }
   });
 
@@ -165,8 +173,8 @@ function createOidcRouter(config) {
       if (err) {
         console.error('Session destruction error:', err);
       }
-      // Redirect to home page (frontend is served by backend on same port)
-      res.redirect('/');
+      // Redirect to home page using absolute URL from config
+      res.redirect(buildAbsoluteUrl('/'));
     });
   });
 

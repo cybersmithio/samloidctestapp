@@ -10,6 +10,14 @@ const configLoader = require('../utils/configLoader');
 const router = express.Router();
 
 function createSamlRouter(config) {
+  // Helper function to build absolute URLs from config
+  const buildAbsoluteUrl = (path = '/') => {
+    const protocol = config.application?.useHttps ? 'https' : 'http';
+    const hostname = config.application?.hostname || 'localhost';
+    const port = config.application?.port || 3001;
+    return `${protocol}://${hostname}:${port}${path}`;
+  };
+
   // SAML login initiation
   router.get('/login', (req, res) => {
     try {
@@ -138,8 +146,8 @@ function createSamlRouter(config) {
       // Clear pending IdP
       delete req.session.pendingIdp;
 
-      // Redirect to protected page (frontend is served by backend on same port)
-      res.redirect('/protected');
+      // Redirect to protected page using absolute URL from config
+      res.redirect(buildAbsoluteUrl('/protected'));
     } catch (error) {
       console.error('SAML authentication error:', error);
       res.status(500).json({ error: 'SAML authentication failed' });
@@ -162,8 +170,8 @@ function createSamlRouter(config) {
         // Redirect to IdP logout
         res.redirect(idp.logoutUrl);
       } else {
-        // Redirect to home page (frontend is served by backend on same port)
-        res.redirect('/');
+        // Redirect to home page using absolute URL from config
+        res.redirect(buildAbsoluteUrl('/'));
       }
     });
   });
