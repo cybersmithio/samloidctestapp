@@ -19,11 +19,6 @@ This directory contains the cryptographic materials for the SAML Service Provide
 - **Purpose**: Private key for signing SAML requests and decrypting encrypted assertions
 - **⚠️ SECURITY**: Keep this file private and never commit to version control
 
-### `openssl.cnf` - OpenSSL Configuration
-- Configuration file used to generate the certificate
-- Contains subject information and extensions
-- Includes Subject Alternative Names (SANs) for localhost
-
 ## Usage
 
 ### In SAML Metadata
@@ -52,7 +47,8 @@ If you need to regenerate the certificate (e.g., after expiration), run:
 
 ```bash
 cd data/certsAndKeys
-openssl req -x509 -newkey rsa:2048 -keyout sp-key.pem -out sp-cert.pem -days 3650 -nodes -config openssl.cnf
+openssl req -x509 -newkey rsa:2048 -keyout sp-key.pem -out sp-cert.pem -days 3650 -nodes \
+  -subj "/C=US/ST=State/L=City/O=SAML-OIDC-Test-App/OU=Development/CN=localhost"
 ```
 
 ## Production Considerations
@@ -80,7 +76,8 @@ For production, consider:
 
 2. **Generate a Certificate Signing Request (CSR)**:
    ```bash
-   openssl req -new -newkey rsa:2048 -nodes -keyout sp-key.pem -out sp.csr -config openssl.cnf
+   openssl req -new -newkey rsa:2048 -nodes -keyout sp-key.pem -out sp.csr \
+     -subj "/C=US/ST=State/L=City/O=SAML-OIDC-Test-App/OU=Development/CN=localhost"
    ```
 
 3. **Submit CSR to CA**: The CA will verify your identity and issue a certificate
@@ -132,9 +129,6 @@ chmod 644 sp-cert.pem
 
 # Private key (readable only by owner)
 chmod 600 sp-key.pem
-
-# Config file (readable by all)
-chmod 644 openssl.cnf
 ```
 
 ## Integration with Application

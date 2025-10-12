@@ -3,20 +3,45 @@ const session = require('express-session');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const samlAuth = require('./auth/saml');
 const oidcAuth = require('./auth/oidc');
 const configLoader = require('./utils/configLoader');
 const { SignedXml } = require('xml-crypto');
 const { parseString } = require('xml2js');
 
+// Load configuration first (needed by middleware)
+const config = configLoader.loadConfig();
+
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || config.application?.port || 3001;
 
 // Middleware
+// Helper function to get protocol based on config
+const getProtocol = () => {
+  return config.application?.useHttps ? 'https' : 'http';
+};
+
+// Helper function to get the frontend dev server URL (only used in development)
+const getFrontendDevUrl = () => {
+  const hostname = config.application?.hostname || 'localhost';
+  const protocol = getProtocol();
+  // In development, React dev server typically runs on port 3000
+  return `${protocol}://${hostname}:3000`;
+};
+
+// Configure CORS based on environment and config
+const getCorsOrigin = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return true;  // In production, allow same-origin requests
+  }
+  // In development, construct React dev server URL from config
+  return getFrontendDevUrl();
+};
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? true  // In production, allow same-origin requests
-    : 'http://workstation.cybersmith.local:3000',  // In development, allow React dev server
+  origin: getCorsOrigin(),
   credentials: true
 }));
 app.use(express.json());
@@ -34,13 +59,15 @@ app.use(session({
   }
 }));
 
-// Load configuration
-const config = configLoader.loadConfig();
-
 // API Routes
 app.get('/api/config', (req, res) => {
   // Return only safe configuration data to the client
   const safeConfig = {
+    application: {
+      hostname: config.application?.hostname,
+      port: PORT,
+      useHttps: config.application?.useHttps
+    },
     identityProviders: config.identityProviders.map(idp => ({
       name: idp.name,
       protocol: idp.protocol
@@ -255,9 +282,12 @@ app.post('/assert', async (req, res) => {
       }
 
       // Redirect to protected page
-      const redirectUrl = process.env.NODE_ENV === 'production'
-        ? '/protected'
-        : 'http://workstation.cybersmith.local:3000/protected';
+      let redirectUrl;
+      if (process.env.NODE_ENV === 'production') {
+        redirectUrl = '/protected';
+      } else {
+        redirectUrl = `${getFrontendDevUrl()}/protected`;
+      }
 
       res.redirect(redirectUrl);
     });
@@ -375,14 +405,17 @@ app.use('/auth/saml', samlAuth(config));
 // OIDC authentication routes
 app.use('/auth/oidc', oidcAuth(config));
 
-// Serve static files from the React build folder in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../build')));
+// Serve static files from the React build folder
+const buildPath = path.join(__dirname, '../build');
+if (fs.existsSync(buildPath)) {
+  app.use(express.static(buildPath));
 
   // Handle React routing - return index.html for all non-API routes
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../build', 'index.html'));
+    res.sendFile(path.join(buildPath, 'index.html'));
   });
+} else {
+  console.warn('Build folder not found. Run "npm run build" to create it.');
 }
 
 // Error handling middleware
@@ -393,10 +426,32 @@ app.use((err, req, res, next) => {
 
 // Start server only if not in test environment
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`Server running on http://workstation.cybersmith.local:${PORT}`);
-    console.log(`Loaded ${config.identityProviders.length} identity provider(s)`);
-  });
+  const useHttps = config.application?.useHttps || false;
+  const protocol = useHttps ? 'https' : 'http';
+  const hostname = config.application?.hostname || 'localhost';
+
+  if (useHttps) {
+    // Load SSL certificate and key
+    const certPath = path.join(__dirname, '../data', config.application.serverCertificate);
+    const keyPath = path.join(__dirname, '../data', config.application.serverPrivateKey);
+
+    const httpsOptions = {
+      cert: fs.readFileSync(certPath, 'utf8'),
+      key: fs.readFileSync(keyPath, 'utf8')
+    };
+
+    https.createServer(httpsOptions, app).listen(PORT, () => {
+      console.log(`Server running on ${protocol}://${hostname}:${PORT}`);
+      console.log(`Loaded ${config.identityProviders.length} identity provider(s)`);
+      console.log('HTTPS enabled');
+    });
+  } else {
+    http.createServer(app).listen(PORT, () => {
+      console.log(`Server running on ${protocol}://${hostname}:${PORT}`);
+      console.log(`Loaded ${config.identityProviders.length} identity provider(s)`);
+      console.log('HTTP mode (HTTPS disabled)');
+    });
+  }
 }
 
 module.exports = app;

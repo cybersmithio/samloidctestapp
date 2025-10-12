@@ -16,6 +16,12 @@ const jwksClient = require('jwks-rsa');
 describe('OIDC Authentication Router', () => {
   let app;
   const mockConfig = {
+    application: {
+      hostname: 'localhost',
+      port: 3001,
+      useHttps: false,
+      baseUrl: 'http://localhost:3001'
+    },
     identityProviders: [
       {
         protocol: 'oidc',

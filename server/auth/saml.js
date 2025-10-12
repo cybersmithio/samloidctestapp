@@ -10,6 +10,19 @@ const configLoader = require('../utils/configLoader');
 const router = express.Router();
 
 function createSamlRouter(config) {
+  // Helper function to get protocol based on config
+  const getProtocol = () => {
+    return config.application?.useHttps ? 'https' : 'http';
+  };
+
+  // Helper function to get the frontend dev server URL (only used in development)
+  const getFrontendDevUrl = () => {
+    const hostname = config.application?.hostname || 'localhost';
+    const protocol = getProtocol();
+    // In development, React dev server typically runs on port 3000
+    return `${protocol}://${hostname}:3000`;
+  };
+
   // SAML login initiation
   router.get('/login', (req, res) => {
     try {
@@ -139,7 +152,11 @@ function createSamlRouter(config) {
       delete req.session.pendingIdp;
 
       // Redirect to protected page
-      res.redirect('http://localhost:3000/protected');
+      if (process.env.NODE_ENV === 'production') {
+        res.redirect('/protected');
+      } else {
+        res.redirect(`${getFrontendDevUrl()}/protected`);
+      }
     } catch (error) {
       console.error('SAML authentication error:', error);
       res.status(500).json({ error: 'SAML authentication failed' });
@@ -161,8 +178,10 @@ function createSamlRouter(config) {
       if (idp && idp.logoutUrl) {
         // Redirect to IdP logout
         res.redirect(idp.logoutUrl);
+      } else if (process.env.NODE_ENV === 'production') {
+        res.redirect('/');
       } else {
-        res.redirect('http://localhost:3000');
+        res.redirect(getFrontendDevUrl());
       }
     });
   });
