@@ -4,6 +4,7 @@ const { SignedXml } = require('xml-crypto');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const configLoader = require('../utils/configLoader');
 
 const router = express.Router();
@@ -53,16 +54,41 @@ function createSamlRouter(config) {
         //privateKey: appConfig.samlSigningPrivateKey
       });
 
-      // Base64 encode the request
-      const samlRequest = Buffer.from(authnRequest).toString('base64');
+      // Encode based on binding type (default to 'redirect')
+      const binding = idp.binding || 'redirect';
+      let samlRequest;
 
-      // Build redirect URL
-      const redirectUrl = new URL(idp.loginUrl);
-      redirectUrl.searchParams.append('SAMLRequest', samlRequest);
-      redirectUrl.searchParams.append('RelayState', req.sessionID);
+      if (binding === 'redirect') {
+        // HTTP-Redirect binding: deflate compress, then base64 encode
+        const deflated = zlib.deflateRawSync(Buffer.from(authnRequest, 'utf8'));
+        samlRequest = deflated.toString('base64');
 
-      // Redirect to IdP
-      res.redirect(redirectUrl.toString());
+        // Build redirect URL
+        const redirectUrl = new URL(idp.loginUrl);
+        redirectUrl.searchParams.append('SAMLRequest', samlRequest);
+        redirectUrl.searchParams.append('RelayState', req.sessionID);
+
+        // Redirect to IdP
+        res.redirect(redirectUrl.toString());
+      } else if (binding === 'post') {
+        // HTTP-POST binding: just base64 encode (no deflate)
+        samlRequest = Buffer.from(authnRequest, 'utf8').toString('base64');
+
+        // Send HTML form that auto-submits to IdP
+        const html = `
+<!DOCTYPE html>
+<html>
+<head><title>SAML Request</title></head>
+<body onload="document.forms[0].submit()">
+  <form method="POST" action="${idp.loginUrl}">
+    <input type="hidden" name="SAMLRequest" value="${samlRequest}" />
+    <input type="hidden" name="RelayState" value="${req.sessionID}" />
+    <noscript><button type="submit">Continue</button></noscript>
+  </form>
+</body>
+</html>`;
+        res.send(html);
+      }
     } catch (error) {
       console.error('SAML login error:', error);
       res.status(500).json({ error: 'Failed to initiate SAML login', details: error.message });

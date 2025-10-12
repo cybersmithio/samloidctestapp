@@ -1,7 +1,7 @@
 {
   "application": {
     "hostname": "workstation.cybersmith.local",
-    "entityId": "http://workstation.cybersmith.local:3001/saml/metadata",
+    "entityId": "samlapp1",
     "baseUrl": "http://workstation.cybersmith.local:3001",
     "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
     "samlSigningPrivateKey": "certsAndKeys/sp-key.pem",
@@ -11,6 +11,7 @@
     {
       "protocol": "saml20",
       "name": "Verify IdP",
+      "binding": "redirect",      
       "loginUrl": "https://cybersmith.verify.ibm.com/saml/sps/saml20ip/saml20/login",
       "logoutUrl": "https://cybersmith.verify.ibm.com/idaas/mtfim/sps/idaas/logout",
       "certificate": "cybersmith.verify.ibm.com.cer"
