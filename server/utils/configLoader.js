@@ -8,6 +8,11 @@ function loadConfig() {
     const configData = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(configData);
 
+    // Validate application configuration if present
+    if (config.application) {
+      validateApplicationConfig(config.application);
+    }
+
     // Validate configuration
     if (!config.identityProviders || !Array.isArray(config.identityProviders)) {
       throw new Error('Invalid configuration: identityProviders array is required');
@@ -64,6 +69,30 @@ function validateOidcConfig(idp, index) {
       throw new Error(`Missing ${field} for OIDC IdP at index ${index}`);
     }
   });
+}
+
+function validateApplicationConfig(app) {
+  // Validate HTTPS configuration
+  if (app.useHttps) {
+    const required = ['serverCertificate', 'serverPrivateKey'];
+    required.forEach(field => {
+      if (!app[field]) {
+        throw new Error(`Missing ${field} in application configuration when useHttps is true`);
+      }
+    });
+
+    // Verify certificate and key files exist
+    const certPath = path.join(__dirname, '../../data', app.serverCertificate);
+    const keyPath = path.join(__dirname, '../../data', app.serverPrivateKey);
+
+    if (!fs.existsSync(certPath)) {
+      throw new Error(`Server certificate file not found: ${certPath}`);
+    }
+
+    if (!fs.existsSync(keyPath)) {
+      throw new Error(`Server private key file not found: ${keyPath}`);
+    }
+  }
 }
 
 function loadCertificate(filename) {

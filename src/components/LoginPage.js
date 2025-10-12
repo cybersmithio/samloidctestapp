@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 
 function LoginPage() {
   const [identityProviders, setIdentityProviders] = useState([]);
+  const [appConfig, setAppConfig] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch identity providers from backend
+    // Fetch identity providers and application config from backend
     fetch('/api/config')
       .then(response => response.json())
       .then(data => {
         setIdentityProviders(data.identityProviders);
+        setAppConfig(data.application);
       })
       .catch(err => {
         setError('Failed to load identity providers');
@@ -18,8 +20,17 @@ function LoginPage() {
   }, []);
 
   const handleLogin = (idp) => {
-    // In development, use full backend URL. In production, use relative URL.
-    const backendUrl = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+    // In production, use relative URL (same protocol/host/port as current page)
+    // In development, construct full backend URL using config from the server
+    let backendUrl = '';
+    if (process.env.NODE_ENV !== 'production' && appConfig) {
+      // In development, the React dev server runs on a different port than the backend
+      // Use the protocol from the current page and the backend config
+      const protocol = window.location.protocol; // includes the colon (http: or https:)
+      const hostname = window.location.hostname;
+      const port = appConfig.port || 3001;
+      backendUrl = `${protocol}//${hostname}:${port}`;
+    }
 
     if (idp.protocol === 'saml20') {
       // Redirect to SAML login endpoint

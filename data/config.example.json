@@ -1,11 +1,15 @@
 {
   "application": {
     "hostname": "your-app-domain.com",
+    "port": 3001,
     "entityId": "https://your-app-domain.com/saml/metadata",
     "baseUrl": "https://your-app-domain.com",
     "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
     "samlSigningPrivateKey": "certsAndKeys/sp-key.pem",
-    "signSamlRequests": true
+    "signSamlRequests": true,
+    "useHttps": true,
+    "serverCertificate": "certsAndKeys/server-cert.pem",
+    "serverPrivateKey": "certsAndKeys/server-key.pem"
   },
   "identityProviders": [
     {

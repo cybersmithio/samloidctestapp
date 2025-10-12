@@ -103,7 +103,10 @@ describe('GET /auth/saml/login', () => {
     const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
     const decodedRequest = Buffer.from(samlRequest, 'base64').toString('utf8');
 
-    const expectedIssuer = config.application?.entityId || `http://${config.application?.hostname || 'localhost'}:3001/saml/metadata`;
+    const protocol = config.application?.useHttps ? 'https' : 'http';
+    const hostname = config.application?.hostname || 'localhost';
+    const port = config.application?.port || 3001;
+    const expectedIssuer = config.application?.entityId || `${protocol}://${hostname}:${port}/saml/metadata`;
     expect(decodedRequest).toContain(`<saml:Issuer>${expectedIssuer}</saml:Issuer>`);
   });
 });

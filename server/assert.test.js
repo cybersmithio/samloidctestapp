@@ -10,7 +10,10 @@ describe('POST /assert', () => {
 
   beforeAll(() => {
     config = configLoader.loadConfig();
-    const baseUrl = config.application?.baseUrl || `http://${config.application?.hostname || 'localhost'}:3001`;
+    const protocol = config.application?.useHttps ? 'https' : 'http';
+    const hostname = config.application?.hostname || 'localhost';
+    const port = config.application?.port || 3001;
+    const baseUrl = config.application?.baseUrl || `${protocol}://${hostname}:${port}`;
     destinationUrl = `${baseUrl}/assert`;
   });
 
