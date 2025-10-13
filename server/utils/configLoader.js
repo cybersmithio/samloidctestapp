@@ -72,6 +72,11 @@ function validateOidcConfig(idp, index) {
 }
 
 function validateApplicationConfig(app) {
+  // Set default publicPort to match port if not specified
+  if (!app.publicPort) {
+    app.publicPort = app.port || 3001;
+  }
+
   // Validate HTTPS configuration
   if (app.useHttps) {
     const required = ['serverCertificate', 'serverPrivateKey'];

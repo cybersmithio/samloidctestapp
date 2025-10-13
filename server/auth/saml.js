@@ -14,8 +14,12 @@ function createSamlRouter(config) {
   const buildAbsoluteUrl = (path = '/') => {
     const protocol = config.application?.useHttps ? 'https' : 'http';
     const hostname = config.application?.hostname || 'localhost';
-    const port = config.application?.port || 3001;
-    return `${protocol}://${hostname}:${port}${path}`;
+    const publicPort = config.application?.publicPort || config.application?.port || 3001;
+    // Only include port in URL if it's not the default for the protocol
+    const portPart = (protocol === 'https' && publicPort === 443) || (protocol === 'http' && publicPort === 80)
+      ? ''
+      : `:${publicPort}`;
+    return `${protocol}://${hostname}${portPart}${path}`;
   };
 
   // SAML login initiation

@@ -2,12 +2,13 @@
   "application": {
     "hostname": "workstation.cybersmith.local",
     "port": 3001,
+    "publicPort": 3001,
     "entityId": "samlapp1",
     "baseUrl": "https://workstation.cybersmith.local:3001",
     "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
     "samlSigningPrivateKey": "certsAndKeys/sp-key.pem",
     "signSamlRequests": true,
-    "useHttps": true,
+    "useHttps": false,
     "serverCertificate": "certsAndKeys/server-cert.pem",
     "serverPrivateKey": "certsAndKeys/server-key.pem"
   },
