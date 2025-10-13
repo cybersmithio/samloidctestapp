@@ -93,8 +93,10 @@ Configuration is loaded from `data/config.json` at server startup via `server/ut
 **Critical:** The configuration distinguishes between:
 - `port`: The port the backend server listens on (e.g., 3001)
 - `publicPort`: The port users connect to via proxy/ingress (e.g., 443 in Azure)
+- `useHttps`: Whether the backend server itself uses HTTPS (requires certificates)
+- `useHttpsPublicly`: Whether public-facing URLs should use HTTPS (proxy SSL termination)
 
-All absolute URLs are constructed using `publicPort` for external redirects, ensuring correct behavior when Azure (or other proxies) forwards 443 → 3001. The `buildAbsoluteUrl()` helper automatically omits standard ports (80/443) from URLs.
+All absolute URLs are constructed using `publicPort` and `useHttpsPublicly` for external redirects, ensuring correct behavior when Azure (or other proxies) terminates SSL and forwards HTTPS:443 → HTTP:3001. The `buildAbsoluteUrl()` helper automatically omits standard ports (80/443) from URLs.
 
 ### Authentication Modules
 
@@ -176,7 +178,11 @@ When building redirect URLs or absolute URLs:
 - Standard ports (80/443) are automatically omitted from URLs
 - This ensures compatibility with proxies, Docker, and Azure Container Apps
 
-**Example:** In Azure, users connect to `https://myapp.azurecontainerapps.io` (port 443), but the container runs on port 3001. Set `publicPort: 443` and `port: 3001` in config.
+**Example:** In Azure Container Apps:
+- Users connect to `https://myapp.azurecontainerapps.io` (port 443)
+- Azure proxy terminates SSL and forwards HTTP to container on port 3001
+- Configuration: `port: 3001`, `publicPort: 443`, `useHttps: false`, `useHttpsPublicly: true`
+- Result: Server listens on HTTP:3001, generates URLs like `https://myapp.azurecontainerapps.io`
 
 ## Important Notes
 
