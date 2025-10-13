@@ -77,6 +77,11 @@ function validateApplicationConfig(app) {
     app.publicPort = app.port || 3001;
   }
 
+  // Set default useHttpsPublicly to match useHttps if not specified
+  if (app.useHttpsPublicly === undefined) {
+    app.useHttpsPublicly = app.useHttps || false;
+  }
+
   // Validate HTTPS configuration
   if (app.useHttps) {
     const required = ['serverCertificate', 'serverPrivateKey'];

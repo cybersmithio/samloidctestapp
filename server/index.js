@@ -268,7 +268,8 @@ app.post('/assert', async (req, res) => {
       }
 
       // Construct absolute redirect URL using config
-      const protocol = config.application?.useHttps ? 'https' : 'http';
+      // Use useHttpsPublicly for public URLs (handles proxy SSL termination)
+      const protocol = config.application?.useHttpsPublicly ? 'https' : 'http';
       const hostname = config.application?.hostname || req.hostname || 'localhost';
       const publicPort = config.application?.publicPort || PORT;
       // Only include port in URL if it's not the default for the protocol

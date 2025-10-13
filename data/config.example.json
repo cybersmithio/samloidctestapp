@@ -8,7 +8,8 @@
     "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
     "samlSigningPrivateKey": "certsAndKeys/sp-key.pem",
     "signSamlRequests": true,
-    "useHttps": true,
+    "useHttps": false,
+    "useHttpsPublicly": true,
     "serverCertificate": "certsAndKeys/server-cert.pem",
     "serverPrivateKey": "certsAndKeys/server-key.pem"
   },

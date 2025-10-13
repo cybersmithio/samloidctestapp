@@ -9,7 +9,8 @@ const router = express.Router();
 function createOidcRouter(config) {
   // Helper function to build absolute URLs from config
   const buildAbsoluteUrl = (path = '/') => {
-    const protocol = config.application?.useHttps ? 'https' : 'http';
+    // Use useHttpsPublicly for public URLs (handles proxy SSL termination)
+    const protocol = config.application?.useHttpsPublicly ? 'https' : 'http';
     const hostname = config.application?.hostname || 'localhost';
     const publicPort = config.application?.publicPort || config.application?.port || 3001;
     // Only include port in URL if it's not the default for the protocol
