@@ -1,6 +1,11 @@
 # Azure Container App
 To run this application as an Azure Container App follow these steps:
-* 
+* Create a storage account
+* Create an storage account blob, in the new storage account, by going to Object storage > Storage accounts and clicking Create
+* Create a file share in the storage account blob.  Call it testappdata
+* Upload all the files into testappdata, keeping the directory structure
+* Modify the config.json as needed
+
 * Login to Azure Portal
     * Go to Container Apps
     * Create a new container app
