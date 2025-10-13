@@ -127,7 +127,7 @@ describe('OIDC Authentication Router', () => {
         });
 
       expect(response.status).toBe(302);
-      expect(response.headers.location).toContain('error=User+denied+access');
+      expect(response.headers.location).toBe('http://localhost:3001/?error=User%20denied%20access');
     });
 
     test('returns error when state is invalid', async () => {
@@ -150,10 +150,22 @@ describe('OIDC Authentication Router', () => {
         .get('/auth/oidc/login')
         .query({ idp: 'Test OIDC IdP' });
 
-      // Extract state from redirect URL
+      // Extract state and nonce from redirect URL
       const location = loginResponse.headers.location;
       const stateMatch = location.match(/state=([^&]+)/);
       const state = stateMatch ? stateMatch[1] : '';
+      const nonceMatch = location.match(/nonce=([^&]+)/);
+      const nonce = nonceMatch ? nonceMatch[1] : '';
+
+      // Update JWT mock to return the correct nonce for this test
+      jwt.verify.mockImplementationOnce((token, key, options, callback) => {
+        callback(null, {
+          sub: 'user123',
+          email: 'user@example.com',
+          name: 'Test User',
+          nonce: nonce  // Use the actual nonce from the login session
+        });
+      });
 
       // Mock successful token exchange
       global.fetch.mockResolvedValueOnce({
@@ -181,8 +193,8 @@ describe('OIDC Authentication Router', () => {
         });
 
       expect(response.status).toBe(302);
-      // Frontend is served by backend on same port, so redirect is relative
-      expect(response.headers.location).toBe('/protected');
+      // Redirect uses absolute URL from config
+      expect(response.headers.location).toBe('http://localhost:3001/protected');
     });
 
     test('handles token exchange failure', async () => {
@@ -220,8 +232,8 @@ describe('OIDC Authentication Router', () => {
       const response = await request(app).get('/auth/oidc/logout');
 
       expect(response.status).toBe(302);
-      // Frontend is served by backend on same port, so redirect is relative
-      expect(response.headers.location).toBe('/');
+      // Redirect uses absolute URL from config
+      expect(response.headers.location).toBe('http://localhost:3001/');
     });
   });
 });

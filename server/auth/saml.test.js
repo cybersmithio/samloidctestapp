@@ -143,8 +143,8 @@ describe('SAML Authentication Router', () => {
         .send({ SAMLResponse: samlResponse });
 
       expect(response.status).toBe(302);
-      // Frontend is served by backend on same port, so redirect is relative
-      expect(response.headers.location).toBe('/protected');
+      // Redirect uses absolute URL from config
+      expect(response.headers.location).toBe('http://localhost:3001/protected');
     });
   });
 
@@ -152,11 +152,38 @@ describe('SAML Authentication Router', () => {
     test('destroys session and redirects to IdP logout', async () => {
       const agent = request.agent(app);
 
-      // Set up session with user
+      // First, initiate login to set up session
       await agent
         .get('/auth/saml/login')
         .query({ idp: 'Test SAML IdP' });
 
+      // Create a mock SAML response to complete authentication
+      const mockSamlXml = `
+        <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
+          <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
+            <saml:Subject>
+              <saml:NameID>user@example.com</saml:NameID>
+            </saml:Subject>
+            <saml:AttributeStatement>
+              <saml:Attribute Name="email">
+                <saml:AttributeValue>user@example.com</saml:AttributeValue>
+              </saml:Attribute>
+            </saml:AttributeStatement>
+          </saml:Assertion>
+          <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+            <ds:SignedInfo></ds:SignedInfo>
+          </ds:Signature>
+        </samlp:Response>
+      `;
+
+      const samlResponse = Buffer.from(mockSamlXml).toString('base64');
+
+      // Complete authentication to store user in session
+      await agent
+        .post('/auth/saml/callback')
+        .send({ SAMLResponse: samlResponse });
+
+      // Now test logout
       const response = await agent.get('/auth/saml/logout');
 
       expect(response.status).toBe(302);

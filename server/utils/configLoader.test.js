@@ -18,7 +18,8 @@ describe('configLoader', () => {
             name: 'Test SAML',
             loginUrl: 'https://idp.example.com/sso',
             logoutUrl: 'https://idp.example.com/logout',
-            certificate: 'cert.pem'
+            certificate: 'cert.pem',
+            binding: 'redirect'
           },
           {
             protocol: 'oidc',
