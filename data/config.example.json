@@ -2,6 +2,7 @@
   "application": {
     "hostname": "your-app-domain.com",
     "port": 3001,
+    "publicPort": 443,
     "entityId": "https://your-app-domain.com/saml/metadata",
     "baseUrl": "https://your-app-domain.com",
     "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
