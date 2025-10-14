@@ -418,6 +418,9 @@ if (process.env.NODE_ENV !== 'test') {
   const useHttps = config.application?.useHttps || false;
   const protocol = useHttps ? 'https' : 'http';
   const hostname = config.application?.hostname || 'localhost';
+  const publicProtocol = config.application?.useHttpsPublicly ? 'https' : 'http';
+  const publicPort = config.application?.publicPort || PORT;
+
 
   if (useHttps) {
     // Load SSL certificate and key
@@ -431,12 +434,14 @@ if (process.env.NODE_ENV !== 'test') {
 
     https.createServer(httpsOptions, app).listen(PORT, () => {
       console.log(`Server running on ${protocol}://${hostname}:${PORT}`);
+      console.log(`Server publicly known as ${publicProtocol}://${hostname}:${publicPort}`);
       console.log(`Loaded ${config.identityProviders.length} identity provider(s)`);
       console.log('HTTPS enabled');
     });
   } else {
     http.createServer(app).listen(PORT, () => {
       console.log(`Server running on ${protocol}://${hostname}:${PORT}`);
+      console.log(`Server publicly known as ${publicProtocol}://${hostname}:${publicPort}`);
       console.log(`Loaded ${config.identityProviders.length} identity provider(s)`);
       console.log('HTTP mode (HTTPS disabled)');
     });
