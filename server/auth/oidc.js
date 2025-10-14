@@ -36,8 +36,13 @@ function createOidcRouter(config) {
     const nonce = crypto.randomBytes(16).toString('hex');
 
     // Construct callback URL from application baseUrl
-    const baseUrl = config.application?.baseUrl || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = config.application?.baseUrl || buildAbsoluteUrl('');
     const callbackUrl = `${baseUrl}/auth/oidc/callback`;
+
+    // Determine response mode based on response type
+    const responseType = idp.responseType || 'code';
+    const usesFragmentResponse = responseType !== 'code' && responseType !== 'none';
+    const responseMode = usesFragmentResponse ? 'fragment' : 'query';
 
     // Store state, nonce, and IdP info in session
     req.session.oidcState = state;
@@ -45,97 +50,219 @@ function createOidcRouter(config) {
     req.session.pendingIdp = {
       name: idp.name,
       protocol: 'oidc',
-      config: idp
+      config: idp,
+      responseType: responseType
     };
 
     // Build authorization URL
     const authUrl = new URL(idp.authorizationUrl);
     authUrl.searchParams.append('client_id', idp.clientId);
-    authUrl.searchParams.append('response_type', 'code');
+    authUrl.searchParams.append('response_type', responseType);
     authUrl.searchParams.append('redirect_uri', callbackUrl);
     authUrl.searchParams.append('scope', idp.scope);
     authUrl.searchParams.append('state', state);
     authUrl.searchParams.append('nonce', nonce);
+    authUrl.searchParams.append('response_mode', responseMode);
 
     res.redirect(authUrl.toString());
   });
 
-  // OIDC callback
+  // OIDC callback - handles both query parameters (code flow) and fragments (implicit/hybrid)
   router.get('/callback', async (req, res) => {
+    // If no query parameters, return HTML page to extract fragment parameters
+    if (Object.keys(req.query).length === 0) {
+      return res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Processing Authentication...</title>
+  <script>
+    // Extract parameters from URL fragment and POST to server
+    const fragment = window.location.hash.substring(1);
+    if (fragment) {
+      const params = new URLSearchParams(fragment);
+
+      // Send as application/x-www-form-urlencoded (compatible with express.urlencoded)
+      fetch(window.location.pathname, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      }).then(response => {
+        if (!response.ok) {
+          // Try to extract error message from response
+          return response.json().then(data => {
+            throw new Error(data.error || 'Authentication failed with status ' + response.status);
+          }).catch(jsonErr => {
+            // If JSON parsing fails, throw generic error
+            throw new Error('Authentication failed with status ' + response.status);
+          });
+        }
+        // Check if response is redirect (3xx) or success
+        if (response.redirected) {
+          window.location.href = response.url;
+        } else {
+          // For successful non-redirect responses, go to protected page
+          window.location.href = '/protected';
+        }
+      }).catch(err => {
+        console.error('Authentication error:', err);
+        window.location.href = '/?error=' + encodeURIComponent(err.message);
+      });
+    } else {
+      // No fragment params, likely an error or direct access
+      window.location.href = '/?error=no_auth_response';
+    }
+  </script>
+</head>
+<body>
+  <p>Processing authentication response...</p>
+</body>
+</html>`);
+    }
+
+    await handleOidcCallback(req, res, req.query);
+  });
+
+  // POST handler for fragment-based responses (implicit/hybrid flows)
+  router.post('/callback', async (req, res) => {
+    console.log('[OIDC Callback POST] Content-Type:', req.get('Content-Type'));
+    console.log('[OIDC Callback POST] Body keys:', Object.keys(req.body));
+    console.log('[OIDC Callback POST] Has state:', !!req.body.state);
+    console.log('[OIDC Callback POST] Has id_token:', !!req.body.id_token);
+    await handleOidcCallback(req, res, req.body);
+  });
+
+  // Shared callback handler
+  async function handleOidcCallback(req, res, params) {
     try {
-      const { code, state, error, error_description } = req.query;
+      console.log('[OIDC Callback] Received parameters:', Object.keys(params).join(', '));
+      const { code, id_token, access_token, token_type, state, error, error_description } = params;
 
       // Check for error from IdP
       if (error) {
-        console.error('OIDC error:', error, error_description);
+        console.error('[OIDC Callback] Error from IdP:', error, error_description);
         // Redirect to home page with error using absolute URL from config
         return res.redirect(buildAbsoluteUrl(`/?error=${encodeURIComponent(error_description || error)}`));
       }
 
       // Verify state parameter
       if (!state || state !== req.session.oidcState) {
-        return res.status(400).json({ error: 'Invalid state parameter' });
+        const errorMsg = !state ? 'Missing state parameter' : 'Invalid state parameter (possible CSRF attack)';
+        console.error('[OIDC Callback] State validation failed:', errorMsg);
+        console.error('[OIDC Callback] Expected state:', req.session.oidcState);
+        console.error('[OIDC Callback] Received state:', state);
+        return res.status(400).json({ error: errorMsg });
       }
 
       const pendingIdp = req.session.pendingIdp;
       if (!pendingIdp || pendingIdp.protocol !== 'oidc') {
-        return res.status(400).json({ error: 'No pending OIDC authentication' });
+        const errorMsg = 'No pending OIDC authentication - session may have expired';
+        console.error('[OIDC Callback] Session validation failed:', errorMsg);
+        console.error('[OIDC Callback] Session data:', {
+          hasPendingIdp: !!pendingIdp,
+          protocol: pendingIdp?.protocol,
+          sessionID: req.sessionID
+        });
+        return res.status(400).json({ error: errorMsg });
       }
+
+      console.log('[OIDC Callback] Authenticated with IdP:', pendingIdp.name);
+      console.log('[OIDC Callback] Response type:', pendingIdp.responseType);
 
       const idpConfig = pendingIdp.config;
+      const responseType = pendingIdp.responseType || 'code';
 
-      // Construct callback URL from application baseUrl
-      const baseUrl = config.application?.baseUrl || `${req.protocol}://${req.get('host')}`;
-      const callbackUrl = `${baseUrl}/auth/oidc/callback`;
+      // Determine what tokens we should have based on response type
+      const usesCode = responseType.includes('code');
+      const expectsIdToken = responseType.includes('id_token');
+      const expectsAccessToken = responseType.includes('token');
 
-      // Exchange authorization code for tokens
-      const tokenResponse = await fetch(idpConfig.tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: code,
-          redirect_uri: callbackUrl,
-          client_id: idpConfig.clientId,
-          client_secret: idpConfig.clientSecret
-        })
+      let finalIdToken = id_token;
+      let finalAccessToken = access_token;
+
+      // Handle authorization code flow - exchange code for tokens
+      if (usesCode && code) {
+        const baseUrl = config.application?.baseUrl || buildAbsoluteUrl('');
+        const callbackUrl = `${baseUrl}/auth/oidc/callback`;
+
+        const tokenResponse = await fetch(idpConfig.tokenUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: callbackUrl,
+            client_id: idpConfig.clientId,
+            client_secret: idpConfig.clientSecret
+          })
+        });
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          throw new Error(`Token exchange failed: ${errorText}`);
+        }
+
+        const tokens = await tokenResponse.json();
+        // Tokens from token endpoint take precedence
+        finalIdToken = tokens.id_token || finalIdToken;
+        finalAccessToken = tokens.access_token || finalAccessToken;
+      }
+
+      // Validate that we received expected tokens
+      console.log('[OIDC Callback] Token validation:', {
+        expectsIdToken,
+        hasIdToken: !!finalIdToken,
+        expectsAccessToken,
+        hasAccessToken: !!finalAccessToken
       });
 
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        throw new Error(`Token exchange failed: ${errorText}`);
+      if (expectsIdToken && !finalIdToken) {
+        const errorMsg = 'Expected ID token but none received';
+        console.error('[OIDC Callback]', errorMsg);
+        throw new Error(errorMsg);
       }
 
-      const tokens = await tokenResponse.json();
-      const { id_token, access_token } = tokens;
+      // Verify and decode ID token if present
+      let decodedToken = null;
+      if (finalIdToken) {
+        console.log('[OIDC Callback] Verifying ID token...');
+        try {
+          decodedToken = await verifyJwt(finalIdToken, idpConfig);
+          console.log('[OIDC Callback] ID token verified successfully. Subject:', decodedToken.sub);
+        } catch (verifyError) {
+          console.error('[OIDC Callback] ID token verification failed:', verifyError.message);
+          throw verifyError;
+        }
 
-      if (!id_token) {
-        throw new Error('No ID token received');
+        // Verify nonce
+        if (decodedToken.nonce !== req.session.oidcNonce) {
+          console.error('[OIDC Callback] Nonce mismatch - Expected:', req.session.oidcNonce, 'Got:', decodedToken.nonce);
+          throw new Error('Invalid nonce in ID token');
+        }
+        console.log('[OIDC Callback] Nonce verified successfully');
       }
 
-      // Verify JWT signature and decode
-      const decodedToken = await verifyJwt(id_token, idpConfig);
+      // Build user info from ID token claims or fetch from userinfo endpoint
+      let userInfo = {};
 
-      // Verify nonce
-      if (decodedToken.nonce !== req.session.oidcNonce) {
-        throw new Error('Invalid nonce');
+      if (decodedToken) {
+        userInfo = {
+          id: decodedToken.sub,
+          email: decodedToken.email,
+          name: decodedToken.name,
+          ...decodedToken
+        };
       }
 
-      // Fetch user info if userInfoUrl is provided
-      let userInfo = {
-        id: decodedToken.sub,
-        email: decodedToken.email,
-        name: decodedToken.name,
-        ...decodedToken
-      };
-
-      if (idpConfig.userInfoUrl && access_token) {
+      // Fetch user info from userinfo endpoint if available and we have an access token
+      if (idpConfig.userInfoUrl && finalAccessToken) {
         try {
           const userInfoResponse = await fetch(idpConfig.userInfoUrl, {
             headers: {
-              'Authorization': `Bearer ${access_token}`
+              'Authorization': `Bearer ${finalAccessToken}`
             }
           });
 
@@ -148,13 +275,20 @@ function createOidcRouter(config) {
         }
       }
 
+      // For token-only flows without ID token, we need at least something from userinfo
+      if (!decodedToken && Object.keys(userInfo).length === 0) {
+        throw new Error('Unable to obtain user information - no ID token and userinfo fetch failed');
+      }
+
       // Store user info in session
       req.session.user = {
         protocol: 'oidc',
         idpName: pendingIdp.name,
+        responseType: responseType,
         user: userInfo,
-        jwtToken: id_token,
-        accessToken: access_token,
+        jwtToken: finalIdToken,
+        accessToken: finalAccessToken,
+        tokenType: token_type,
         authenticatedAt: new Date().toISOString()
       };
 
@@ -163,14 +297,16 @@ function createOidcRouter(config) {
       delete req.session.oidcNonce;
       delete req.session.pendingIdp;
 
+      console.log('[OIDC Callback] Authentication successful - redirecting to /protected');
       // Redirect to protected page using absolute URL from config
       res.redirect(buildAbsoluteUrl('/protected'));
     } catch (error) {
-      console.error('OIDC authentication error:', error);
+      console.error('[OIDC Callback] Authentication error:', error.message);
+      console.error('[OIDC Callback] Error stack:', error.stack);
       // Redirect to home page with error using absolute URL from config
       res.redirect(buildAbsoluteUrl(`/?error=${encodeURIComponent(error.message)}`));
     }
-  });
+  }
 
   // OIDC logout
   router.get('/logout', (req, res) => {
@@ -192,24 +328,43 @@ async function verifyJwt(token, idpConfig) {
     const decodedHeader = jwt.decode(token, { complete: true });
 
     if (!decodedHeader) {
-      return reject(new Error('Invalid JWT token'));
+      console.error('[JWT Verify] Failed to decode JWT token header');
+      return reject(new Error('Invalid JWT token - unable to decode'));
     }
 
-    // Create JWKS client
+    console.log('[JWT Verify] Token header:', {
+      alg: decodedHeader.header.alg,
+      kid: decodedHeader.header.kid,
+      typ: decodedHeader.header.typ
+    });
+
+    // Use configured jwksUrl or try to derive from metadataUrl
+    const jwksUri = idpConfig.jwksUrl || idpConfig.metadataUrl?.replace('/.well-known/openid-configuration', '/discovery/keys');
+
+    if (!jwksUri) {
+      console.error('[JWT Verify] No jwksUrl configured and cannot derive from metadataUrl');
+      return verifyCertificateBased(token, idpConfig, resolve, reject);
+    }
+
+    console.log('[JWT Verify] Fetching JWKS from:', jwksUri);
+
     const client = jwksClient({
-      jwksUri: idpConfig.metadataUrl.replace('/.well-known/openid-configuration', '/discovery/keys'),
+      jwksUri: jwksUri,
       cache: true,
-      cacheMaxAge: 86400000 // 24 hours
+      cacheMaxAge: 86400000, // 24 hours
+      timeout: 10000 // 10 second timeout
     });
 
     // Get signing key
     client.getSigningKey(decodedHeader.header.kid, (err, key) => {
       if (err) {
+        console.error('[JWT Verify] JWKS fetch failed:', err.message);
         // If JWKS fetch fails, try using certificate-based verification
         return verifyCertificateBased(token, idpConfig, resolve, reject);
       }
 
       const signingKey = key.getPublicKey();
+      console.log('[JWT Verify] Retrieved signing key successfully');
 
       // Verify token
       jwt.verify(token, signingKey, {
@@ -218,9 +373,11 @@ async function verifyJwt(token, idpConfig) {
         algorithms: ['RS256', 'RS384', 'RS512']
       }, (verifyErr, decoded) => {
         if (verifyErr) {
+          console.error('[JWT Verify] Verification failed:', verifyErr.message);
           return reject(new Error(`JWT verification failed: ${verifyErr.message}`));
         }
 
+        console.log('[JWT Verify] Token verified successfully');
         resolve(decoded);
       });
     });

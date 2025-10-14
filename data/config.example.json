@@ -25,12 +25,14 @@
     {
       "protocol": "oidc",
       "name": "Example OIDC IdP",
+      "responseType": "code",
       "tenantUrl": "https://login.example.com/tenant-id",
       "issuerUrl": "https://login.example.com/tenant-id/v2.0",
       "authorizationUrl": "https://login.example.com/tenant-id/oauth2/v2.0/authorize",
       "tokenUrl": "https://login.example.com/tenant-id/oauth2/v2.0/token",
       "userInfoUrl": "https://graph.example.com/oidc/userinfo",
       "metadataUrl": "https://login.example.com/tenant-id/v2.0/.well-known/openid-configuration",
+      "jwksUrl": "https://login.example.com/tenant-id/discovery/v2.0/keys",
       "clientId": "your-client-id",
       "clientSecret": "your-client-secret",
       "scope": "openid profile email"

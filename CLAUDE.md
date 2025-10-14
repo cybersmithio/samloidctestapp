@@ -77,10 +77,13 @@ npm run docker:logs
 
 **OIDC Authentication:**
 1. User clicks IdP button → `/auth/oidc/login?idp=<name>`
-2. Server generates state/nonce, redirects to IdP authorization URL
-3. IdP authenticates and redirects to `/auth/oidc/callback?code=...`
-4. Server exchanges code for tokens at IdP token endpoint
-5. Server verifies JWT signature using JWKS or certificate
+2. Server generates state/nonce, determines response_mode based on response_type
+3. Server redirects to IdP authorization URL with response_type parameter
+4. IdP authenticates and returns response based on flow:
+   - **Authorization Code Flow** (`code`): Query param → token exchange
+   - **Implicit Flow** (`id_token`, `token`, `id_token token`): Fragment → HTML handler extracts and POSTs
+   - **Hybrid Flow** (`code id_token`, `code token`, `code id_token token`): Both
+5. Server verifies tokens (JWT signature via JWKS or certificate)
 6. Session created, user redirected to `/protected`
 
 ### Configuration System
@@ -107,10 +110,13 @@ All absolute URLs are constructed using `publicPort` and `useHttpsPublicly` for 
 - Parses assertions using xml2js to extract user attributes
 
 **`server/auth/oidc.js`** - OIDC/OAuth2 authentication router
-- Implements authorization code flow
+- Supports multiple response types (code, id_token, token, hybrid flows)
+- Configurable via `responseType` parameter per IdP (defaults to `code`)
+- Handles fragment-based responses (implicit/hybrid) via HTML intermediary page
 - State and nonce validation for CSRF protection
-- JWT verification via JWKS endpoint or certificate-based fallback
+- JWT verification via JWKS endpoint (configured via `jwksUrl`) or certificate-based fallback
 - Optional UserInfo endpoint fetching
+- Valid response types: `code`, `id_token`, `token`, `id_token token`, `code id_token`, `code token`, `code id_token token`, `none`
 
 **`server/index.js`** - Main application server
 - Serves React frontend from `/build` directory
@@ -156,7 +162,12 @@ Coverage thresholds: 70% for branches, functions, lines, and statements.
 
 1. Add IdP configuration to `data/config.json` under `identityProviders` array
 2. For SAML: Place IdP certificate in `data/certificates/`
-3. For OIDC: Ensure all required URLs and credentials are configured
+3. For OIDC:
+   - Ensure all required URLs and credentials are configured
+   - Set `responseType` to match IdP requirements (default: `code`)
+   - Configure `jwksUrl` to point to the IdP's JSON Web Key Set for JWT signature verification
+   - For flows using `code`: `tokenUrl` and `clientSecret` required
+   - For implicit-only flows: `clientSecret` optional (public client)
 4. Restart server to load new config
 5. New login button will appear automatically on frontend
 
