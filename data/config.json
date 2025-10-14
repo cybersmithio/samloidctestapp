@@ -8,8 +8,8 @@
     "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
     "samlSigningPrivateKey": "certsAndKeys/sp-key.pem",
     "signSamlRequests": true,
-    "useHttps": false,
-    "useHttpsPublicly": false,
+    "useHttps": true,
+    "useHttpsPublicly": true,
     "serverCertificate": "certsAndKeys/server-cert.pem",
     "serverPrivateKey": "certsAndKeys/server-key.pem"
   },
@@ -24,15 +24,17 @@
     },
     {
       "protocol": "oidc",
-      "name": "Example OIDC IdP",
-      "tenantUrl": "https://login.example.com/tenant-id",
-      "issuerUrl": "https://login.example.com/tenant-id/v2.0",
-      "authorizationUrl": "https://login.example.com/tenant-id/oauth2/v2.0/authorize",
-      "tokenUrl": "https://login.example.com/tenant-id/oauth2/v2.0/token",
-      "userInfoUrl": "https://graph.example.com/oidc/userinfo",
-      "metadataUrl": "https://login.example.com/tenant-id/v2.0/.well-known/openid-configuration",
-      "clientId": "your-client-id",
-      "clientSecret": "your-client-secret",
+      "name": "OIDC Test App 1",
+      "responseType": "id_token",
+      "tenantUrl": "https://cybersmith.verify.ibm.com",
+      "issuerUrl": "https://cybersmith.verify.ibm.com/oauth2",
+      "authorizationUrl": "https://cybersmith.verify.ibm.com/oauth2/authorize",
+      "tokenUrl": "https://cybersmith.verify.ibm.com/oauth2/token",
+      "userInfoUrl": "https://cybersmith.verify.ibm.com/oauth2/userinfo",
+      "metadataUrl": "https://cybersmith.verify.ibm.com/oauth2/.well-known/openid-configuration",
+      "jwksUrl": "https://cybersmith.verify.ibm.com/oauth2/jwks1",
+      "clientId": "8d005df8-5f44-44b3-a3a7-9383c0cd75ec",
+      "clientSecret": "eHCXWcC4x2v6JL1W3Ax4",
       "scope": "openid profile email"
     }
   ]

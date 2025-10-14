@@ -62,13 +62,52 @@ function validateSamlConfig(idp, index) {
 }
 
 function validateOidcConfig(idp, index) {
-  const required = ['tenantUrl', 'issuerUrl', 'authorizationUrl', 'tokenUrl',
-                    'clientId', 'clientSecret', 'scope'];
+  const required = ['tenantUrl', 'issuerUrl', 'authorizationUrl', 'clientId', 'scope'];
   required.forEach(field => {
     if (!idp[field]) {
       throw new Error(`Missing ${field} for OIDC IdP at index ${index}`);
     }
   });
+
+  // Set default response type if not specified (authorization code flow)
+  if (!idp.responseType) {
+    idp.responseType = 'code';
+  }
+
+  // Validate response type
+  const validResponseTypes = [
+    'code',                    // Authorization Code Flow
+    'id_token',                // Implicit Flow (ID Token only)
+    'token',                   // Implicit Flow (Access Token only)
+    'id_token token',          // Implicit Flow (both tokens)
+    'code id_token',           // Hybrid Flow
+    'code token',              // Hybrid Flow
+    'code id_token token',     // Hybrid Flow (all)
+    'none'                     // No tokens (rare, for logout flows)
+  ];
+
+  if (!validResponseTypes.includes(idp.responseType)) {
+    throw new Error(`Invalid responseType for OIDC IdP at index ${index}: must be one of ${validResponseTypes.join(', ')}`);
+  }
+
+  // Validate required fields based on response type
+  const usesAuthorizationCode = idp.responseType.includes('code');
+  const usesImplicitOrHybrid = idp.responseType !== 'code' && idp.responseType !== 'none';
+
+  // Token URL and client secret are required for flows that use authorization code
+  if (usesAuthorizationCode) {
+    if (!idp.tokenUrl) {
+      throw new Error(`Missing tokenUrl for OIDC IdP at index ${index} (required for response_type containing 'code')`);
+    }
+    if (!idp.clientSecret) {
+      throw new Error(`Missing clientSecret for OIDC IdP at index ${index} (required for response_type containing 'code')`);
+    }
+  }
+
+  // For implicit/hybrid flows, warn if client secret is missing (optional for public clients)
+  if (usesImplicitOrHybrid && !idp.clientSecret) {
+    console.warn(`OIDC IdP at index ${index}: clientSecret not provided (assuming public client for response_type '${idp.responseType}')`);
+  }
 }
 
 function validateApplicationConfig(app) {
