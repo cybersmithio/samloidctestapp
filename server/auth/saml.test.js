@@ -33,6 +33,14 @@ describe('SAML Authentication Router', () => {
         loginUrl: 'https://idp.example.com/sso/saml',
         logoutUrl: 'https://idp.example.com/sso/logout',
         certificate: 'test-cert.pem'
+      },
+      {
+        protocol: 'saml20',
+        name: 'Test SAML IdP POST',
+        binding: 'post',
+        loginUrl: 'https://idp.example.com/sso/saml',
+        logoutUrl: 'https://idp.example.com/sso/logout',
+        certificate: 'test-cert.pem'
       }
     ]
   };
@@ -149,7 +157,7 @@ describe('SAML Authentication Router', () => {
   });
 
   describe('GET /auth/saml/logout', () => {
-    test('destroys session and redirects to IdP logout', async () => {
+    test('generates SAML LogoutRequest with HTTP-Redirect binding', async () => {
       const agent = request.agent(app);
 
       // First, initiate login to set up session
@@ -183,11 +191,144 @@ describe('SAML Authentication Router', () => {
         .post('/auth/saml/callback')
         .send({ SAMLResponse: samlResponse });
 
-      // Now test logout
+      // Now test logout with HTTP-Redirect binding
       const response = await agent.get('/auth/saml/logout');
 
       expect(response.status).toBe(302);
       expect(response.headers.location).toContain('https://idp.example.com/sso/logout');
+      expect(response.headers.location).toContain('SAMLRequest=');
+
+      // Extract and decode the SAMLRequest to verify structure
+      const locationUrl = new URL(response.headers.location);
+      const samlRequest = locationUrl.searchParams.get('SAMLRequest');
+      expect(samlRequest).toBeTruthy();
+
+      // Decode the request (base64 -> inflate -> XML)
+      const decoded = Buffer.from(samlRequest, 'base64');
+      const inflated = require('zlib').inflateRawSync(decoded).toString('utf8');
+
+      // Verify it contains LogoutRequest elements
+      expect(inflated).toContain('<samlp:LogoutRequest');
+      expect(inflated).toContain('user@example.com');
+      expect(inflated).toContain('<saml:Issuer>');
+    });
+
+    test('generates SAML LogoutRequest with HTTP-POST binding', async () => {
+      const agent = request.agent(app);
+
+      // Login with POST binding IdP
+      await agent
+        .get('/auth/saml/login')
+        .query({ idp: 'Test SAML IdP POST' });
+
+      // Complete authentication
+      const mockSamlXml = `
+        <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
+          <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
+            <saml:Subject>
+              <saml:NameID>user@example.com</saml:NameID>
+            </saml:Subject>
+          </saml:Assertion>
+          <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+            <ds:SignedInfo></ds:SignedInfo>
+          </ds:Signature>
+        </samlp:Response>
+      `;
+
+      const samlResponse = Buffer.from(mockSamlXml).toString('base64');
+      await agent
+        .post('/auth/saml/callback')
+        .send({ SAMLResponse: samlResponse });
+
+      // Test logout with POST binding
+      const response = await agent.get('/auth/saml/logout');
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain('<form');
+      expect(response.text).toContain('action="https://idp.example.com/sso/logout"');
+      expect(response.text).toContain('name="SAMLRequest"');
+
+      // Extract SAMLRequest from HTML form
+      const match = response.text.match(/name="SAMLRequest" value="([^"]+)"/);
+      expect(match).toBeTruthy();
+
+      const samlRequest = match[1];
+      const decoded = Buffer.from(samlRequest, 'base64').toString('utf8');
+
+      // Verify it contains LogoutRequest elements
+      expect(decoded).toContain('<samlp:LogoutRequest');
+      expect(decoded).toContain('user@example.com');
+    });
+
+    test('redirects to home page when no IdP logout URL is configured', async () => {
+      // Create an IdP without logoutUrl
+      const mockConfigNoLogout = {
+        application: {
+          hostname: 'localhost',
+          port: 3001,
+          useHttps: false,
+          baseUrl: 'http://localhost:3001'
+        },
+        identityProviders: [
+          {
+            protocol: 'saml20',
+            name: 'Test SAML IdP No Logout',
+            loginUrl: 'https://idp.example.com/sso/saml',
+            certificate: 'test-cert.pem'
+          }
+        ]
+      };
+
+      const appNoLogout = express();
+      appNoLogout.use(express.json());
+      appNoLogout.use(express.urlencoded({ extended: true }));
+      appNoLogout.use(session({
+        secret: 'test-secret',
+        resave: false,
+        saveUninitialized: true
+      }));
+      appNoLogout.use('/auth/saml', createSamlRouter(mockConfigNoLogout));
+
+      const agent = request.agent(appNoLogout);
+
+      // Login
+      await agent
+        .get('/auth/saml/login')
+        .query({ idp: 'Test SAML IdP No Logout' });
+
+      // Complete authentication
+      const mockSamlXml = `
+        <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
+          <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
+            <saml:Subject>
+              <saml:NameID>user@example.com</saml:NameID>
+            </saml:Subject>
+          </saml:Assertion>
+          <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+            <ds:SignedInfo></ds:SignedInfo>
+          </ds:Signature>
+        </samlp:Response>
+      `;
+
+      const samlResponse = Buffer.from(mockSamlXml).toString('base64');
+      await agent
+        .post('/auth/saml/callback')
+        .send({ SAMLResponse: samlResponse });
+
+      // Test logout
+      const response = await agent.get('/auth/saml/logout');
+
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe('http://localhost:3001/');
+      expect(response.headers.location).not.toContain('SAMLRequest');
+    });
+
+    test('handles logout when user is not authenticated', async () => {
+      const response = await request(app)
+        .get('/auth/saml/logout');
+
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe('http://localhost:3001/');
     });
   });
 });

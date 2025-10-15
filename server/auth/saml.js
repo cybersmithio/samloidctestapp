@@ -42,18 +42,18 @@ function createSamlRouter(config) {
         certificate: idp.certificate
       };
 
+      // Store request ID in session for validation
+      const requestId = '_' + crypto.randomBytes(16).toString('hex');
+      req.session.samlRequestId = requestId;
+
       // Generate SAML AuthnRequest
       const appConfig = config.application || {
         entityId: `${req.protocol}://${req.get('host')}/saml/metadata`,
         baseUrl: `${req.protocol}://${req.get('host')}`
       };
 
-      const acsUrl = `${appConfig.baseUrl}/assert`;
-      const requestId = '_' + crypto.randomBytes(16).toString('hex');
+      const acsUrl = `${appConfig.baseUrl}/auth/saml/callback`;
       const issueInstant = new Date().toISOString();
-
-      // Store request ID in session for validation
-      req.session.samlRequestId = requestId;
 
       // Generate the SAML AuthnRequest XML
       const authnRequest = generateAuthnRequest({
@@ -69,26 +69,34 @@ function createSamlRouter(config) {
 
       // Encode based on binding type (default to 'redirect')
       const binding = idp.binding || 'redirect';
-      let samlRequest;
 
-      if (binding === 'redirect') {
-        // HTTP-Redirect binding: deflate compress, then base64 encode
-        const deflated = zlib.deflateRawSync(Buffer.from(authnRequest, 'utf8'));
-        samlRequest = deflated.toString('base64');
+      // Save session before sending response to ensure session data is persisted
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.status(500).json({ error: 'Failed to save session' });
+        }
 
-        // Build redirect URL
-        const redirectUrl = new URL(idp.loginUrl);
-        redirectUrl.searchParams.append('SAMLRequest', samlRequest);
-        redirectUrl.searchParams.append('RelayState', req.sessionID);
+        let samlRequest;
 
-        // Redirect to IdP
-        res.redirect(redirectUrl.toString());
-      } else if (binding === 'post') {
-        // HTTP-POST binding: just base64 encode (no deflate)
-        samlRequest = Buffer.from(authnRequest, 'utf8').toString('base64');
+        if (binding === 'redirect') {
+          // HTTP-Redirect binding: deflate compress, then base64 encode
+          const deflated = zlib.deflateRawSync(Buffer.from(authnRequest, 'utf8'));
+          samlRequest = deflated.toString('base64');
 
-        // Send HTML form that auto-submits to IdP
-        const html = `
+          // Build redirect URL
+          const redirectUrl = new URL(idp.loginUrl);
+          redirectUrl.searchParams.append('SAMLRequest', samlRequest);
+          redirectUrl.searchParams.append('RelayState', req.sessionID);
+
+          // Redirect to IdP
+          res.redirect(redirectUrl.toString());
+        } else if (binding === 'post') {
+          // HTTP-POST binding: just base64 encode (no deflate)
+          samlRequest = Buffer.from(authnRequest, 'utf8').toString('base64');
+
+          // Send HTML form that auto-submits to IdP
+          const html = `
 <!DOCTYPE html>
 <html>
 <head><title>SAML Request</title></head>
@@ -100,8 +108,9 @@ function createSamlRouter(config) {
   </form>
 </body>
 </html>`;
-        res.send(html);
-      }
+          res.send(html);
+        }
+      });
     } catch (error) {
       console.error('SAML login error:', error);
       res.status(500).json({ error: 'Failed to initiate SAML login', details: error.message });
@@ -151,8 +160,15 @@ function createSamlRouter(config) {
       // Clear pending IdP
       delete req.session.pendingIdp;
 
-      // Redirect to protected page using absolute URL from config
-      res.redirect(buildAbsoluteUrl('/protected'));
+      // Save session before redirect to ensure it's persisted
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.status(500).json({ error: 'Failed to save session' });
+        }
+        // Redirect to protected page using absolute URL from config
+        res.redirect(buildAbsoluteUrl('/protected'));
+      });
     } catch (error) {
       console.error('SAML authentication error:', error);
       res.status(500).json({ error: 'SAML authentication failed' });
@@ -161,24 +177,106 @@ function createSamlRouter(config) {
 
   // SAML logout
   router.get('/logout', (req, res) => {
-    const idpName = req.session?.user?.idpName;
-    const idp = config.identityProviders.find(
-      i => i.protocol === 'saml20' && i.name === idpName
-    );
+    console.log('SAML /logout has been called');
 
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Session destruction error:', err);
-      }
+    try {
+      const idpName = req.session?.user?.idpName;
+      console.log(`idpName: ${idpName}`);
+      const nameID = req.session?.user?.user?.nameID;
+      console.log(`nameId: ${nameID}`);
 
-      if (idp && idp.logoutUrl) {
-        // Redirect to IdP logout
-        res.redirect(idp.logoutUrl);
-      } else {
-        // Redirect to home page using absolute URL from config
+      const idp = config.identityProviders.find(
+        i => i.protocol === 'saml20' && i.name === idpName
+      );
+
+      // Capture user info before destroying session
+      const userInfo = {
+        idp,
+        nameID
+      };
+
+      console.log(`userInfo`);
+      console.log(userInfo);
+
+
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Session destruction error:', err);
+        }
+
+        if (userInfo.idp && userInfo.idp.logoutUrl) {
+          console.log(`The IdP has a logout Url: ${userInfo.idp.logoutUrl}`);
+
+          // Generate SAML LogoutRequest
+          const appConfig = config.application || {
+            entityId: `${req.protocol}://${req.get('host')}/saml/metadata`,
+            baseUrl: `${req.protocol}://${req.get('host')}`
+          };
+
+          const requestId = '_' + crypto.randomBytes(16).toString('hex');
+          const issueInstant = new Date().toISOString();
+
+          const logoutRequest = generateLogoutRequest({
+            requestId,
+            issueInstant,
+            destination: userInfo.idp.logoutUrl,
+            entityId: appConfig.entityId,
+            nameID: userInfo.nameID || 'unknown'
+          });
+
+          // Encode based on binding type (default to 'redirect')
+          const binding = userInfo.idp.binding || 'redirect';
+          let samlRequest;
+
+          if (binding === 'redirect') {
+            console.log(`The binding for logout is an HTTP redirect`);
+
+            // HTTP-Redirect binding: deflate compress, then base64 encode
+            const deflated = zlib.deflateRawSync(Buffer.from(logoutRequest, 'utf8'));
+            samlRequest = deflated.toString('base64');
+
+            // Build redirect URL
+            const redirectUrl = new URL(userInfo.idp.logoutUrl);
+            redirectUrl.searchParams.append('SAMLRequest', samlRequest);
+
+            // Redirect to IdP logout
+            console.log(`Sending a redirect back to the user for logout`);
+
+            res.redirect(redirectUrl.toString());
+          } else if (binding === 'post') {
+            console.log(`The binding for logout is an HTTP POST`);
+            // HTTP-POST binding: just base64 encode (no deflate)
+            samlRequest = Buffer.from(logoutRequest, 'utf8').toString('base64');
+
+            // Send HTML form that auto-submits to IdP
+            const html = `
+<!DOCTYPE html>
+<html>
+<head><title>SAML Logout Request</title></head>
+<body onload="document.forms[0].submit()">
+  <form method="POST" action="${userInfo.idp.logoutUrl}">
+    <input type="hidden" name="SAMLRequest" value="${samlRequest}" />
+    <noscript><button type="submit">Continue</button></noscript>
+  </form>
+</body>
+</html>`;
+            console.log(`Sending an HTML page back to the user for logout`);
+            res.send(html);
+          }
+        } else {
+          console.log(`There is no logout URL for the IdP, so just sending the user home`);
+
+          // Redirect to home page using absolute URL from config
+          res.redirect(buildAbsoluteUrl('/'));
+        }
+      });
+    } catch (error) {
+      console.error('SAML logout error:', error);
+      // Attempt to destroy session even on error
+      req.session.destroy(() => {
         res.redirect(buildAbsoluteUrl('/'));
-      }
-    });
+      });
+    }
   });
 
   return router;
@@ -320,6 +418,30 @@ function generateAuthnRequest(options) {
   }
 
   return authnRequest;
+}
+
+function generateLogoutRequest(options) {
+  const {
+    requestId,
+    issueInstant,
+    destination,
+    entityId,
+    nameID
+  } = options;
+
+  // Build the SAML LogoutRequest XML
+  const logoutRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                     xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                     ID="${requestId}"
+                     Version="2.0"
+                     IssueInstant="${issueInstant}"
+                     Destination="${destination}">
+  <saml:Issuer>${entityId}</saml:Issuer>
+  <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${nameID}</saml:NameID>
+</samlp:LogoutRequest>`;
+
+  return logoutRequest;
 }
 
 function signAuthnRequest(xml, certificatePath, privateKeyPath) {

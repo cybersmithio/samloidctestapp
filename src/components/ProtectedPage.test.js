@@ -129,9 +129,69 @@ describe('ProtectedPage', () => {
     });
   });
 
-  test('logout button calls logout API and redirects', async () => {
+  test('logout button redirects to SAML logout endpoint for SAML authentication', async () => {
+    const mockCredential = {
+      protocol: 'saml20',
+      idpName: 'Test SAML IdP',
+      user: { email: 'test@example.com', nameID: 'user@example.com' }
+    };
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockCredential
+    });
+
+    // Mock window.location.href
+    delete window.location;
+    window.location = { href: '' };
+
+    renderProtectedPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Logout')).toBeInTheDocument();
+    });
+
+    const logoutButton = screen.getByText('Logout');
+    fireEvent.click(logoutButton);
+
+    await waitFor(() => {
+      expect(window.location.href).toBe('/auth/saml/logout');
+    });
+  });
+
+  test('logout button redirects to OIDC logout endpoint for OIDC authentication', async () => {
     const mockCredential = {
       protocol: 'oidc',
+      idpName: 'Test OIDC IdP',
+      user: { email: 'test@example.com' }
+    };
+
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockCredential
+    });
+
+    // Mock window.location.href
+    delete window.location;
+    window.location = { href: '' };
+
+    renderProtectedPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Logout')).toBeInTheDocument();
+    });
+
+    const logoutButton = screen.getByText('Logout');
+    fireEvent.click(logoutButton);
+
+    await waitFor(() => {
+      expect(window.location.href).toBe('/auth/oidc/logout');
+    });
+  });
+
+  test('logout button calls generic API logout for other protocols', async () => {
+    const mockCredential = {
+      protocol: 'other',
       idpName: 'Test IdP',
       user: { email: 'test@example.com' }
     };
@@ -161,9 +221,9 @@ describe('ProtectedPage', () => {
     });
   });
 
-  test('handles logout error gracefully', async () => {
+  test('handles logout error gracefully for generic logout', async () => {
     const mockCredential = {
-      protocol: 'oidc',
+      protocol: 'other',
       idpName: 'Test IdP',
       user: { email: 'test@example.com' }
     };

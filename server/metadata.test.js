@@ -15,13 +15,13 @@ describe('GET /saml/metadata', () => {
     expect(response.text).toContain('SPSSODescriptor');
   });
 
-  test('should include AssertionConsumerService with /assert endpoint', async () => {
+  test('should include AssertionConsumerService with /auth/saml/callback endpoint', async () => {
     const response = await request(app)
       .get('/saml/metadata');
 
     expect(response.status).toBe(200);
     expect(response.text).toContain('AssertionConsumerService');
-    expect(response.text).toContain('/assert');
+    expect(response.text).toContain('/auth/saml/callback');
     expect(response.text).toContain('HTTP-POST');
   });
 

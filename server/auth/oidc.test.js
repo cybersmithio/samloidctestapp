@@ -139,7 +139,7 @@ describe('OIDC Authentication Router', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Invalid state parameter');
+      expect(response.body.error).toBe('Invalid state parameter (possible CSRF attack)');
     });
 
     test('exchanges code for tokens and creates session', async () => {
