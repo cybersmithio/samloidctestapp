@@ -3,9 +3,7 @@
 * General
 * Sign-on
     * Sign-on method: SAML2.0
-    * Provider ID: samlapp1
-        * This is the unique identifier of the application with it's IdP
-    * Target URL (a.k.a. "Assertion consumer service URL (HTTP-POST):") https://appFQDN:appPort/assert
+    * Provide the metadata file from the application
     * Use identity provider initiated single sign-on: Enabled
 
 # Example OIDC Setup 1
