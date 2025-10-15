@@ -24,6 +24,7 @@ describe('configLoader', () => {
           {
             protocol: 'oidc',
             name: 'Test OIDC',
+            responseType: 'code',
             tenantUrl: 'https://login.example.com/tenant',
             issuerUrl: 'https://login.example.com/issuer',
             authorizationUrl: 'https://login.example.com/auth',

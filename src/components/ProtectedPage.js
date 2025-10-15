@@ -28,14 +28,26 @@ function ProtectedPage() {
   }, [navigate]);
 
   const handleLogout = () => {
-    fetch('/api/logout', { method: 'POST' })
-      .then(() => {
-        navigate('/');
-      })
-      .catch(err => {
-        console.error('Logout error:', err);
-        navigate('/');
-      });
+    // For SAML, redirect to SAML logout endpoint to send LogoutRequest to IdP
+    // For OIDC, redirect to OIDC logout endpoint
+    // Otherwise, use the generic API logout
+    if (credential?.protocol === 'saml20') {
+      // Redirect to SAML logout - this will generate a LogoutRequest and send to IdP
+      window.location.href = '/auth/saml/logout';
+    } else if (credential?.protocol === 'oidc') {
+      // Redirect to OIDC logout
+      window.location.href = '/auth/oidc/logout';
+    } else {
+      // Generic logout for other protocols or local-only logout
+      fetch('/api/logout', { method: 'POST' })
+        .then(() => {
+          navigate('/');
+        })
+        .catch(err => {
+          console.error('Logout error:', err);
+          navigate('/');
+        });
+    }
   };
 
   if (loading) {

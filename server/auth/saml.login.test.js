@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../index');
 const configLoader = require('../utils/configLoader');
+const zlib = require('zlib');
 
 describe('GET /auth/saml/login', () => {
   let config;
@@ -10,7 +11,7 @@ describe('GET /auth/saml/login', () => {
   });
   test('should redirect to IdP with SAMLRequest parameter', async () => {
     const response = await request(app)
-      .get('/auth/saml/login?idp=Verify IdP');
+      .get('/auth/saml/login?idp=SAML Test application 1');
 
     expect(response.status).toBe(302);
     expect(response.headers.location).toContain('cybersmith.verify.ibm.com');
@@ -20,7 +21,7 @@ describe('GET /auth/saml/login', () => {
 
   test('should generate valid SAML AuthnRequest XML', async () => {
     const response = await request(app)
-      .get('/auth/saml/login?idp=Verify IdP');
+      .get('/auth/saml/login?idp=SAML Test application 1');
 
     expect(response.status).toBe(302);
 
@@ -30,26 +31,28 @@ describe('GET /auth/saml/login', () => {
 
     expect(samlRequest).toBeTruthy();
 
-    // Decode and verify it's valid XML
-    const decodedRequest = Buffer.from(samlRequest, 'base64').toString('utf8');
+    // Decode and inflate (HTTP-Redirect binding uses deflate compression)
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
 
     expect(decodedRequest).toContain('<?xml version="1.0"');
     expect(decodedRequest).toContain('<samlp:AuthnRequest');
     expect(decodedRequest).toContain('xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"');
     expect(decodedRequest).toContain('<saml:Issuer>');
     expect(decodedRequest).toContain('AssertionConsumerServiceURL');
-    expect(decodedRequest).toContain('/assert');
+    expect(decodedRequest).toContain('/auth/saml/callback');
   });
 
   test('should include signature in signed requests', async () => {
     const response = await request(app)
-      .get('/auth/saml/login?idp=Verify IdP');
+      .get('/auth/saml/login?idp=SAML Test application 1');
 
     expect(response.status).toBe(302);
 
     const redirectUrl = new URL(response.headers.location);
     const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
-    const decodedRequest = Buffer.from(samlRequest, 'base64').toString('utf8');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
 
     // Check if signing is enabled in config
     if (decodedRequest.includes('<ds:Signature')) {
@@ -61,11 +64,12 @@ describe('GET /auth/saml/login', () => {
 
   test('should include required SAML elements', async () => {
     const response = await request(app)
-      .get('/auth/saml/login?idp=Verify IdP');
+      .get('/auth/saml/login?idp=SAML Test application 1');
 
     const redirectUrl = new URL(response.headers.location);
     const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
-    const decodedRequest = Buffer.from(samlRequest, 'base64').toString('utf8');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
 
     // Verify required attributes
     expect(decodedRequest).toContain('ID="_');
@@ -86,22 +90,24 @@ describe('GET /auth/saml/login', () => {
 
   test('should set destination to IdP login URL', async () => {
     const response = await request(app)
-      .get('/auth/saml/login?idp=Verify IdP');
+      .get('/auth/saml/login?idp=SAML Test application 1');
 
     const redirectUrl = new URL(response.headers.location);
     const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
-    const decodedRequest = Buffer.from(samlRequest, 'base64').toString('utf8');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
 
     expect(decodedRequest).toContain('Destination="https://cybersmith.verify.ibm.com/saml/sps/saml20ip/saml20/login"');
   });
 
   test('should include entityId as Issuer', async () => {
     const response = await request(app)
-      .get('/auth/saml/login?idp=Verify IdP');
+      .get('/auth/saml/login?idp=SAML Test application 1');
 
     const redirectUrl = new URL(response.headers.location);
     const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
-    const decodedRequest = Buffer.from(samlRequest, 'base64').toString('utf8');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
 
     const protocol = config.application?.useHttps ? 'https' : 'http';
     const hostname = config.application?.hostname || 'localhost';
