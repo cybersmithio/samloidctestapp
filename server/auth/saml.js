@@ -129,10 +129,40 @@ function createSamlRouter(config) {
       // Decode the SAML response (base64 encoded)
       const decodedSaml = Buffer.from(samlResponse, 'base64').toString('utf8');
 
-      // Get IdP configuration from session
-      const pendingIdp = req.session.pendingIdp;
+      // Get IdP configuration from session (SP-initiated flow)
+      let pendingIdp = req.session.pendingIdp;
+
+      // If no pending IdP, this is IdP-initiated SSO
+      // Extract the Issuer from the SAML response to identify the IdP
       if (!pendingIdp) {
-        return res.status(400).json({ error: 'No pending authentication' });
+        try {
+          const issuer = await extractIssuerFromSamlResponse(decodedSaml);
+
+          // Find the IdP configuration by matching the issuer URL
+          const idp = config.identityProviders.find(
+            i => i.protocol === 'saml20' && i.issuerUrl === issuer
+          );
+
+          if (!idp) {
+            return res.status(400).json({
+              error: 'Identity provider not found',
+              details: `No configured IdP found with issuer: ${issuer}`
+            });
+          }
+
+          // Create a pendingIdp object for IdP-initiated flow
+          pendingIdp = {
+            name: idp.name,
+            protocol: 'saml20',
+            certificate: idp.certificate
+          };
+        } catch (extractError) {
+          console.error('Failed to extract issuer from SAML response:', extractError);
+          return res.status(400).json({
+            error: 'Invalid SAML response',
+            details: 'Could not identify identity provider'
+          });
+        }
       }
 
       // Load the certificate for signature verification
@@ -371,6 +401,43 @@ async function parseSamlAssertion(samlXml) {
         });
 
         resolve(userInfo);
+      } catch (parseError) {
+        reject(parseError);
+      }
+    });
+  });
+}
+
+async function extractIssuerFromSamlResponse(samlXml) {
+  return new Promise((resolve, reject) => {
+    parseString(samlXml, { explicitArray: false }, (err, result) => {
+      if (err) {
+        return reject(err);
+      }
+
+      try {
+        // Navigate SAML structure to extract Issuer
+        const response = result['samlp:Response'] || result.Response;
+
+        if (!response) {
+          throw new Error('Invalid SAML response structure');
+        }
+
+        // Get Issuer from Response element
+        const issuer = response.Issuer || response['saml:Issuer'];
+
+        if (!issuer) {
+          throw new Error('No Issuer found in SAML response');
+        }
+
+        // Issuer can be a string or an object with _
+        const issuerValue = typeof issuer === 'string' ? issuer : issuer._;
+
+        if (!issuerValue) {
+          throw new Error('Issuer value is empty');
+        }
+
+        resolve(issuerValue);
       } catch (parseError) {
         reject(parseError);
       }

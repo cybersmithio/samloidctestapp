@@ -17,7 +17,8 @@
     {
       "protocol": "saml20",
       "name": "SAML Test application 1",
-      "binding": "redirect",      
+      "issuerUrl": "https://cybersmith.verify.ibm.com",
+      "binding": "redirect",
       "loginUrl": "https://cybersmith.verify.ibm.com/saml/sps/saml20ip/saml20/login",
       "logoutUrl": "https://cybersmith.verify.ibm.com/idaas/mtfim/sps/idaas/logout",
       "certificate": "cybersmith.verify.ibm.com.cer"
