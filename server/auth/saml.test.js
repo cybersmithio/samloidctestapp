@@ -30,6 +30,7 @@ describe('SAML Authentication Router', () => {
       {
         protocol: 'saml20',
         name: 'Test SAML IdP',
+        issuerUrl: 'https://idp.example.com',
         loginUrl: 'https://idp.example.com/sso/saml',
         logoutUrl: 'https://idp.example.com/sso/logout',
         certificate: 'test-cert.pem'
@@ -37,6 +38,7 @@ describe('SAML Authentication Router', () => {
       {
         protocol: 'saml20',
         name: 'Test SAML IdP POST',
+        issuerUrl: 'https://idp.example.com',
         binding: 'post',
         loginUrl: 'https://idp.example.com/sso/saml',
         logoutUrl: 'https://idp.example.com/sso/logout',
@@ -103,7 +105,8 @@ describe('SAML Authentication Router', () => {
       expect(response.body.error).toBe('Missing SAML response');
     });
 
-    test('returns error when no pending authentication', async () => {
+    test('returns error for invalid SAML response structure', async () => {
+      // Send a malformed SAML response (no Issuer, no valid structure)
       const samlResponse = Buffer.from('<saml:Response></saml:Response>').toString('base64');
 
       const response = await request(app)
@@ -111,7 +114,7 @@ describe('SAML Authentication Router', () => {
         .send({ SAMLResponse: samlResponse });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('No pending authentication');
+      expect(response.body.error).toBe('Invalid SAML response');
     });
 
     test('processes valid SAML response with signature verification', async () => {
@@ -153,6 +156,78 @@ describe('SAML Authentication Router', () => {
       expect(response.status).toBe(302);
       // Redirect uses absolute URL from config
       expect(response.headers.location).toBe('http://localhost:3001/protected');
+    });
+
+    test('supports IdP-initiated SSO (no pending authentication)', async () => {
+      // Create a mock SAML response with Issuer information
+      const mockSamlXml = `
+        <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                        xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                        ID="_response123"
+                        Version="2.0"
+                        IssueInstant="2025-01-01T00:00:00Z"
+                        Destination="http://localhost:3001/auth/saml/callback">
+          <saml:Issuer>https://idp.example.com</saml:Issuer>
+          <samlp:Status>
+            <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+          </samlp:Status>
+          <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
+            <saml:Issuer>https://idp.example.com</saml:Issuer>
+            <saml:Subject>
+              <saml:NameID>user@example.com</saml:NameID>
+            </saml:Subject>
+            <saml:AttributeStatement>
+              <saml:Attribute Name="email">
+                <saml:AttributeValue>user@example.com</saml:AttributeValue>
+              </saml:Attribute>
+              <saml:Attribute Name="name">
+                <saml:AttributeValue>Test User</saml:AttributeValue>
+              </saml:Attribute>
+            </saml:AttributeStatement>
+          </saml:Assertion>
+          <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+            <ds:SignedInfo></ds:SignedInfo>
+          </ds:Signature>
+        </samlp:Response>
+      `;
+
+      const samlResponse = Buffer.from(mockSamlXml).toString('base64');
+
+      // Send SAML response without prior login (IdP-initiated)
+      const response = await request(app)
+        .post('/auth/saml/callback')
+        .send({ SAMLResponse: samlResponse });
+
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe('http://localhost:3001/protected');
+    });
+
+    test('returns error for IdP-initiated SSO with unknown Issuer', async () => {
+      // Create a SAML response with an unknown Issuer
+      const mockSamlXml = `
+        <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                        xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
+          <saml:Issuer>https://unknown-idp.example.com</saml:Issuer>
+          <saml:Assertion>
+            <saml:Issuer>https://unknown-idp.example.com</saml:Issuer>
+            <saml:Subject>
+              <saml:NameID>user@example.com</saml:NameID>
+            </saml:Subject>
+          </saml:Assertion>
+          <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+            <ds:SignedInfo></ds:SignedInfo>
+          </ds:Signature>
+        </samlp:Response>
+      `;
+
+      const samlResponse = Buffer.from(mockSamlXml).toString('base64');
+
+      const response = await request(app)
+        .post('/auth/saml/callback')
+        .send({ SAMLResponse: samlResponse });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('Identity provider not found');
     });
   });
 
