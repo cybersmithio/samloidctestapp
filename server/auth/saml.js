@@ -133,36 +133,57 @@ function createSamlRouter(config) {
       let pendingIdp = req.session.pendingIdp;
 
       // If no pending IdP, this is IdP-initiated SSO
-      // Extract the Issuer from the SAML response to identify the IdP
+      // Try to identify the IdP using certificate matching (most secure method)
       if (!pendingIdp) {
-        try {
-          const issuer = await extractIssuerFromSamlResponse(decodedSaml);
+        // Get all SAML IdPs
+        const samlIdps = config.identityProviders.filter(i => i.protocol === 'saml20');
 
-          // Find the IdP configuration by matching the issuer URL
-          const idp = config.identityProviders.find(
-            i => i.protocol === 'saml20' && i.issuerUrl === issuer
-          );
+        // Try certificate matching first (cryptographically secure)
+        let matchedIdp = null;
+        for (const idp of samlIdps) {
+          try {
+            const certificate = configLoader.loadCertificate(idp.certificate);
+            const isValid = await verifySamlSignature(decodedSaml, certificate);
 
-          if (!idp) {
+            if (isValid) {
+              matchedIdp = idp;
+              break;
+            }
+          } catch (certError) {
+            // Certificate verification failed, try next IdP
+            continue;
+          }
+        }
+
+        // If certificate matching failed, fall back to issuerUrl matching
+        if (!matchedIdp) {
+          try {
+            const issuer = await extractIssuerFromSamlResponse(decodedSaml);
+
+            // Find the IdP configuration by matching the issuer URL
+            matchedIdp = samlIdps.find(i => i.issuerUrl === issuer);
+
+            if (!matchedIdp) {
+              return res.status(400).json({
+                error: 'Identity provider not found',
+                details: `No configured IdP found with issuer: ${issuer} or matching certificate`
+              });
+            }
+          } catch (extractError) {
+            console.error('Failed to extract issuer from SAML response:', extractError);
             return res.status(400).json({
-              error: 'Identity provider not found',
-              details: `No configured IdP found with issuer: ${issuer}`
+              error: 'Invalid SAML response',
+              details: 'Could not identify identity provider by certificate or issuer'
             });
           }
-
-          // Create a pendingIdp object for IdP-initiated flow
-          pendingIdp = {
-            name: idp.name,
-            protocol: 'saml20',
-            certificate: idp.certificate
-          };
-        } catch (extractError) {
-          console.error('Failed to extract issuer from SAML response:', extractError);
-          return res.status(400).json({
-            error: 'Invalid SAML response',
-            details: 'Could not identify identity provider'
-          });
         }
+
+        // Create a pendingIdp object for IdP-initiated flow
+        pendingIdp = {
+          name: matchedIdp.name,
+          protocol: 'saml20',
+          certificate: matchedIdp.certificate
+        };
       }
 
       // Load the certificate for signature verification
