@@ -7,9 +7,9 @@ const path = require('path');
 const zlib = require('zlib');
 const configLoader = require('../utils/configLoader');
 
-const router = express.Router();
-
 function createSamlRouter(config) {
+  const router = express.Router();
+
   // Helper function to build absolute URLs from config
   const buildAbsoluteUrl = (path = '/') => {
     // Use useHttpsPublicly for public URLs (handles proxy SSL termination)
