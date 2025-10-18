@@ -4,9 +4,9 @@ const jwksClient = require('jwks-rsa');
 const crypto = require('crypto');
 const configLoader = require('../utils/configLoader');
 
-const router = express.Router();
-
 function createOidcRouter(config) {
+  const router = express.Router();
+
   // Helper function to build absolute URLs from config
   const buildAbsoluteUrl = (path = '/') => {
     // Use useHttpsPublicly for public URLs (handles proxy SSL termination)

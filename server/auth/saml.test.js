@@ -431,7 +431,7 @@ describe('SAML Authentication Router', () => {
       expect(decoded).toContain('user@example.com');
     });
 
-    test.skip('redirects to home page when no IdP logout URL is configured', async () => {
+    test('redirects to home page when no IdP logout URL is configured', async () => {
       // Create an IdP without logoutUrl
       const mockConfigNoLogout = {
         application: {
@@ -471,6 +471,7 @@ describe('SAML Authentication Router', () => {
       // Complete authentication
       const mockSamlXml = `
         <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">
+          <saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">https://nologout-idp.example.com</saml:Issuer>
           <saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
             <saml:Subject>
               <saml:NameID>user@example.com</saml:NameID>
