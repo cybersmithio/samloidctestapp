@@ -62,6 +62,7 @@ function createSamlRouter(config) {
         destination: idp.loginUrl,
         entityId: appConfig.entityId,
         acsUrl,
+        authNContextClassRef: idp.authNContextClassRef,
         //signRequest: appConfig.signSamlRequests || false,
         //certificate: appConfig.samlSigningCertificate,
         //privateKey: appConfig.samlSigningPrivateKey
@@ -473,6 +474,7 @@ function generateAuthnRequest(options) {
     destination,
     entityId,
     acsUrl,
+    authNContextClassRef = 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
     signRequest,
     certificate,
     privateKey
@@ -491,7 +493,7 @@ function generateAuthnRequest(options) {
   <saml:Issuer>${entityId}</saml:Issuer>
   <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/>
   <samlp:RequestedAuthnContext Comparison="exact">
-    <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>
+    <saml:AuthnContextClassRef>${authNContextClassRef}</saml:AuthnContextClassRef>
   </samlp:RequestedAuthnContext>
 </samlp:AuthnRequest>`;
 
