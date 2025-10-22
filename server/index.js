@@ -8,6 +8,7 @@ const https = require('https');
 const samlAuth = require('./auth/saml');
 const oidcAuth = require('./auth/oidc');
 const configLoader = require('./utils/configLoader');
+const { displayConfig } = require('./utils/configDisplay');
 
 // Load configuration first (needed by middleware)
 const config = configLoader.loadConfig();
@@ -212,6 +213,7 @@ if (process.env.NODE_ENV !== 'test') {
       console.log(`Server publicly known as ${publicProtocol}://${hostname}:${publicPort}`);
       console.log(`Loaded ${config.identityProviders.length} identity provider(s)`);
       console.log('HTTPS enabled');
+      displayConfig(config);
     });
   } else {
     http.createServer(app).listen(PORT, () => {
@@ -219,6 +221,7 @@ if (process.env.NODE_ENV !== 'test') {
       console.log(`Server publicly known as ${publicProtocol}://${hostname}:${publicPort}`);
       console.log(`Loaded ${config.identityProviders.length} identity provider(s)`);
       console.log('HTTP mode (HTTPS disabled)');
+      displayConfig(config);
     });
   }
 }
