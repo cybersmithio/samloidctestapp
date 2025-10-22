@@ -63,6 +63,7 @@ function createSamlRouter(config) {
         entityId: appConfig.entityId,
         acsUrl,
         authNContextClassRef: idp.authNContextClassRef,
+        forceAuthn: idp.forceAuthn || false,
         //signRequest: appConfig.signSamlRequests || false,
         //certificate: appConfig.samlSigningCertificate,
         //privateKey: appConfig.samlSigningPrivateKey
@@ -475,27 +476,14 @@ function generateAuthnRequest(options) {
     entityId,
     acsUrl,
     authNContextClassRef = 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
+    forceAuthn = false,
     signRequest,
     certificate,
     privateKey
   } = options;
 
-  // Build the SAML AuthnRequest XML with only essential elements
-  let authnRequest = `<?xml version="1.0" encoding="UTF-8"?>
-<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-                    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                    ID="${requestId}"
-                    Version="2.0"
-                    IssueInstant="${issueInstant}"
-                    Destination="${destination}"
-                    AssertionConsumerServiceURL="${acsUrl}"
-                    ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
-  <saml:Issuer>${entityId}</saml:Issuer>
-  <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/>
-  <samlp:RequestedAuthnContext Comparison="exact">
-    <saml:AuthnContextClassRef>${authNContextClassRef}</saml:AuthnContextClassRef>
-  </samlp:RequestedAuthnContext>
-</samlp:AuthnRequest>`;
+  // Build the SAML AuthnRequest XML with only essential elements (no newlines)
+  let authnRequest = `<?xml version="1.0" encoding="UTF-8"?><samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="${requestId}" Version="2.0" IssueInstant="${issueInstant}" Destination="${destination}" AssertionConsumerServiceURL="${acsUrl}" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" ForceAuthn="${forceAuthn}"><saml:Issuer>${entityId}</saml:Issuer><samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/><samlp:RequestedAuthnContext Comparison="exact"><saml:AuthnContextClassRef>${authNContextClassRef}</saml:AuthnContextClassRef></samlp:RequestedAuthnContext></samlp:AuthnRequest>`;
 
   // Sign the request if signing is enabled
   if (signRequest && certificate && privateKey) {
@@ -519,17 +507,8 @@ function generateLogoutRequest(options) {
     nameID
   } = options;
 
-  // Build the SAML LogoutRequest XML
-  const logoutRequest = `<?xml version="1.0" encoding="UTF-8"?>
-<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-                     xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                     ID="${requestId}"
-                     Version="2.0"
-                     IssueInstant="${issueInstant}"
-                     Destination="${destination}">
-  <saml:Issuer>${entityId}</saml:Issuer>
-  <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${nameID}</saml:NameID>
-</samlp:LogoutRequest>`;
+  // Build the SAML LogoutRequest XML (no newlines)
+  const logoutRequest = `<?xml version="1.0" encoding="UTF-8"?><samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="${requestId}" Version="2.0" IssueInstant="${issueInstant}" Destination="${destination}"><saml:Issuer>${entityId}</saml:Issuer><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${nameID}</saml:NameID></samlp:LogoutRequest>`;
 
   return logoutRequest;
 }

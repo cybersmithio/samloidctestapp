@@ -159,4 +159,35 @@ describe('GET /auth/saml/login', () => {
 
     expect(decodedRequest).toContain('<samlp:RequestedAuthnContext Comparison="exact">');
   });
+
+  test('should include ForceAuthn=false when not configured', async () => {
+    const response = await request(app)
+      .get('/auth/saml/login?idp=SAML Test application 1');
+
+    const redirectUrl = new URL(response.headers.location);
+    const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
+
+    // Default should be ForceAuthn="false"
+    expect(decodedRequest).toContain('ForceAuthn="false"');
+  });
+
+  test('should include ForceAuthn attribute from IdP configuration', async () => {
+    const response = await request(app)
+      .get('/auth/saml/login?idp=SAML Test application 1');
+
+    const redirectUrl = new URL(response.headers.location);
+    const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
+
+    // Should contain ForceAuthn attribute
+    expect(decodedRequest).toContain('ForceAuthn=');
+
+    // Verify it matches the configured value
+    const idp = config.identityProviders.find(i => i.name === 'SAML Test application 1');
+    const expectedForceAuthn = idp.forceAuthn !== undefined ? idp.forceAuthn : false;
+    expect(decodedRequest).toContain(`ForceAuthn="${expectedForceAuthn}"`);
+  });
 });
