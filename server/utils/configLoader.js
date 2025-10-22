@@ -59,6 +59,11 @@ function validateSamlConfig(idp, index) {
   if (!idp.binding) {
     idp.binding = 'redirect';
   }
+
+  // Set default authNContextClassRef if not specified
+  if (!idp.authNContextClassRef) {
+    idp.authNContextClassRef = 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport';
+  }
 }
 
 function validateOidcConfig(idp, index) {

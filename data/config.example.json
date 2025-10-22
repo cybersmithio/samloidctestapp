@@ -17,10 +17,12 @@
     {
       "protocol": "saml20",
       "name": "Example SAML IdP",
+      "issuerUrl": "https://idp.example.com",
       "binding": "redirect",
       "loginUrl": "https://idp.example.com/sso/saml",
       "logoutUrl": "https://idp.example.com/sso/logout",
-      "certificate": "saml-idp-cert.pem"
+      "certificate": "saml-idp-cert.pem",
+      "authNContextClassRef": "urn:oasis:names:tc:SAML:1.0:am:password"
     },
     {
       "protocol": "oidc",

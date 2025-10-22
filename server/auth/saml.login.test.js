@@ -115,4 +115,48 @@ describe('GET /auth/saml/login', () => {
     const expectedIssuer = config.application?.entityId || `${protocol}://${hostname}:${port}/saml/metadata`;
     expect(decodedRequest).toContain(`<saml:Issuer>${expectedIssuer}</saml:Issuer>`);
   });
+
+  test('should include default AuthNContextClassRef when not configured', async () => {
+    const response = await request(app)
+      .get('/auth/saml/login?idp=SAML Test application 1');
+
+    const redirectUrl = new URL(response.headers.location);
+    const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
+
+    // Should include the AuthNContextClassRef from the IdP configuration
+    const idp = config.identityProviders.find(i => i.name === 'SAML Test application 1');
+    const expectedAuthNContextClassRef = idp.authNContextClassRef || 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport';
+    expect(decodedRequest).toContain(`<saml:AuthnContextClassRef>${expectedAuthNContextClassRef}</saml:AuthnContextClassRef>`);
+  });
+
+  test('should use configured AuthNContextClassRef from IdP configuration', async () => {
+    const response = await request(app)
+      .get('/auth/saml/login?idp=SAML Test application 1');
+
+    const redirectUrl = new URL(response.headers.location);
+    const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
+
+    // Get the configured AuthNContextClassRef for this IdP
+    const idp = config.identityProviders.find(i => i.name === 'SAML Test application 1');
+    expect(idp.authNContextClassRef).toBeDefined();
+
+    // Should include the configured AuthNContextClassRef
+    expect(decodedRequest).toContain(`<saml:AuthnContextClassRef>${idp.authNContextClassRef}</saml:AuthnContextClassRef>`);
+  });
+
+  test('should request exact AuthN context comparison method', async () => {
+    const response = await request(app)
+      .get('/auth/saml/login?idp=SAML Test application 1');
+
+    const redirectUrl = new URL(response.headers.location);
+    const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
+
+    expect(decodedRequest).toContain('<samlp:RequestedAuthnContext Comparison="exact">');
+  });
 });
