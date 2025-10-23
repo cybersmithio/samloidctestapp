@@ -55,18 +55,26 @@ function createSamlRouter(config) {
       const acsUrl = `${appConfig.baseUrl}/auth/saml/callback`;
       const issueInstant = new Date().toISOString();
 
+      // Use IdP-specific entityId if configured, otherwise use application entityId
+      const entityId = idp.entityId || appConfig.entityId;
+
+      // Use IdP-specific signing settings if configured, otherwise use application settings
+      const signRequest = idp.signSamlRequests !== undefined ? idp.signSamlRequests : (appConfig.signSamlRequests || false);
+      const signingCertificate = idp.samlSigningCertificate || appConfig.samlSigningCertificate;
+      const signingPrivateKey = idp.samlSigningPrivateKey || appConfig.samlSigningPrivateKey;
+
       // Generate the SAML AuthnRequest XML
       const authnRequest = generateAuthnRequest({
         requestId,
         issueInstant,
         destination: idp.loginUrl,
-        entityId: appConfig.entityId,
+        entityId: entityId,
         acsUrl,
         authNContextClassRef: idp.authNContextClassRef,
         forceAuthn: idp.forceAuthn || false,
-        //signRequest: appConfig.signSamlRequests || false,
-        //certificate: appConfig.samlSigningCertificate,
-        //privateKey: appConfig.samlSigningPrivateKey
+        signRequest: signRequest,
+        certificate: signingCertificate,
+        privateKey: signingPrivateKey
       });
 
       // Encode based on binding type (default to 'redirect')
