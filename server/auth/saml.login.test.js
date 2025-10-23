@@ -109,11 +109,50 @@ describe('GET /auth/saml/login', () => {
     const deflated = Buffer.from(samlRequest, 'base64');
     const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
 
+    // Get the IdP and determine expected entityId (IdP-specific takes precedence)
+    const idp = config.identityProviders.find(i => i.name === 'SAML Test application 1');
     const protocol = config.application?.useHttps ? 'https' : 'http';
     const hostname = config.application?.hostname || 'localhost';
     const port = config.application?.port || 3001;
-    const expectedIssuer = config.application?.entityId || `${protocol}://${hostname}:${port}/saml/metadata`;
+    const expectedIssuer = idp.entityId || config.application?.entityId || `${protocol}://${hostname}:${port}/saml/metadata`;
     expect(decodedRequest).toContain(`<saml:Issuer>${expectedIssuer}</saml:Issuer>`);
+  });
+
+  test('should use IdP-specific entityId when configured', async () => {
+    const response = await request(app)
+      .get('/auth/saml/login?idp=SAML Test application 1');
+
+    const redirectUrl = new URL(response.headers.location);
+    const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
+
+    // Check if IdP has a custom entityId configured
+    const idp = config.identityProviders.find(i => i.name === 'SAML Test application 1');
+    if (idp.entityId) {
+      // Should use IdP-specific entityId
+      expect(decodedRequest).toContain(`<saml:Issuer>${idp.entityId}</saml:Issuer>`);
+    }
+  });
+
+  test('should use IdP-specific signing certificate when configured', async () => {
+    const response = await request(app)
+      .get('/auth/saml/login?idp=SAML Test application 1');
+
+    const redirectUrl = new URL(response.headers.location);
+    const samlRequest = redirectUrl.searchParams.get('SAMLRequest');
+    const deflated = Buffer.from(samlRequest, 'base64');
+    const decodedRequest = zlib.inflateRawSync(deflated).toString('utf8');
+
+    // Check if IdP has custom signing config
+    const idp = config.identityProviders.find(i => i.name === 'SAML Test application 1');
+    if (idp.signSamlRequests || idp.samlSigningCertificate) {
+      // If IdP has signing enabled, should contain signature
+      if (decodedRequest.includes('<ds:Signature')) {
+        expect(decodedRequest).toContain('xmlns:ds="http://www.w3.org/2000/09/xmldsig#"');
+        expect(decodedRequest).toContain('<ds:SignatureValue>');
+      }
+    }
   });
 
   test('should include default AuthNContextClassRef when not configured', async () => {

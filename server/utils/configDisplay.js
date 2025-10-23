@@ -72,7 +72,20 @@ function displayConfig(config) {
         console.log(indentPrefix + '├─ Logout URL:', idp.logoutUrl);
         console.log(indentPrefix + '├─ Certificate:', idp.certificate);
         if (idp.authNContextClassRef) {
-          console.log(indentPrefix + '└─ AuthN Context:', idp.authNContextClassRef);
+          console.log(indentPrefix + '├─ AuthN Context:', idp.authNContextClassRef);
+        }
+        if (idp.forceAuthn !== undefined) {
+          console.log(indentPrefix + '├─ Force AuthN:', idp.forceAuthn);
+        }
+        if (idp.entityId) {
+          console.log(indentPrefix + '├─ Entity ID:', idp.entityId);
+        }
+        if (idp.signSamlRequests !== undefined || idp.samlSigningCertificate) {
+          console.log(indentPrefix + '├─ Sign Requests:', idp.signSamlRequests !== undefined ? idp.signSamlRequests : 'inherits from app');
+          if (idp.samlSigningCertificate) {
+            console.log(indentPrefix + '├─ Signing Cert:', idp.samlSigningCertificate);
+            console.log(indentPrefix + '└─ Signing Key:', maskSensitiveValue('samlSigningPrivateKey', idp.samlSigningPrivateKey));
+          }
         }
       } else if (idp.protocol === 'oidc') {
         console.log(indentPrefix + '├─ Response Type:', idp.responseType || 'code');
