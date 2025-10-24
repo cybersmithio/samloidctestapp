@@ -36,7 +36,8 @@ COPY server ./server
 COPY --from=frontend-build /app/build ./build
 
 # Copy data directory (config and certificates)
-COPY data ./data
+RUN mkdir data
+#COPY data ./data
 
 # Expose the port
 EXPOSE 3001
