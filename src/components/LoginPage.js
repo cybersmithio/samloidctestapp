@@ -30,10 +30,13 @@ function LoginPage() {
     }
   };
 
-  const handleDownloadMetadata = async () => {
+  const handleDownloadMetadata = async (idpName = null) => {
     try {
+      // Determine which metadata endpoint to use
+      const endpoint = idpName ? `/saml/metadata/${encodeURIComponent(idpName)}` : '/saml/metadata';
+
       // Fetch the metadata from the backend
-      const response = await fetch('/saml/metadata');
+      const response = await fetch(endpoint);
 
       if (!response.ok) {
         throw new Error('Failed to fetch metadata');
@@ -42,11 +45,21 @@ function LoginPage() {
       // Get the XML content as blob
       const blob = await response.blob();
 
+      // Get filename from Content-Disposition header if available
+      let filename = 'metadata.xml';
+      const contentDisposition = response.headers.get('Content-Disposition');
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
       // Create a temporary download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'metadata.xml';
+      link.download = filename;
 
       // Trigger the download
       document.body.appendChild(link);
@@ -72,17 +85,46 @@ function LoginPage() {
 
       <div className="login-buttons">
         {identityProviders.map((idp, index) => (
-          <button
-            key={index}
-            className={`idp-button ${idp.protocol}`}
-            onClick={() => handleLogin(idp)}
-          >
-            {idp.name}
-            <br />
-            <small style={{ fontSize: '0.8rem', opacity: 0.9 }}>
-              ({idp.protocol === 'saml20' ? 'SAML 2.0' : 'OIDC'})
-            </small>
-          </button>
+          <div key={index} style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+            <button
+              className={`idp-button ${idp.protocol}`}
+              onClick={() => handleLogin(idp)}
+              style={{ width: '100%', textAlign: 'left', paddingRight: '120px' }}
+            >
+              <span style={{ display: 'block' }}>
+                {idp.name}
+                <br />
+                <small style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                  ({idp.protocol === 'saml20' ? 'SAML 2.0' : 'OIDC'})
+                </small>
+              </span>
+            </button>
+
+            {/* Per-IdP metadata download button for SAML */}
+            {idp.protocol === 'saml20' && idp.hasCustomMetadata && (
+              <button
+                onClick={() => handleDownloadMetadata(idp.name)}
+                title={`Download metadata for ${idp.name}`}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  backgroundColor: '#17a2b8',
+                  color: 'white',
+                  padding: '6px 10px',
+                  border: 'none',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  whiteSpace: 'nowrap',
+                  fontWeight: '500'
+                }}
+              >
+                ⬇ Metadata
+              </button>
+            )}
+          </div>
         ))}
       </div>
 

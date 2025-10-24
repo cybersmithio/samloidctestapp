@@ -53,10 +53,21 @@ app.get('/api/config', (req, res) => {
       port: PORT,
       useHttps: config.application?.useHttps
     },
-    identityProviders: config.identityProviders.map(idp => ({
-      name: idp.name,
-      protocol: idp.protocol
-    }))
+    identityProviders: config.identityProviders.map(idp => {
+      const safeIdp = {
+        name: idp.name,
+        protocol: idp.protocol
+      };
+
+      // Include IdP-specific metadata if it has custom entityId or signing config
+      if (idp.protocol === 'saml20' && (idp.entityId || idp.samlSigningPrivateKey)) {
+        safeIdp.hasCustomMetadata = true;
+        safeIdp.entityId = idp.entityId;
+        safeIdp.hasSigningConfig = !!(idp.signSamlRequests || idp.samlSigningCertificate);
+      }
+
+      return safeIdp;
+    })
   };
   res.json(safeConfig);
 });
@@ -78,7 +89,7 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
-// SAML metadata endpoint
+// SAML metadata endpoint - application level
 app.get('/saml/metadata', (req, res) => {
   try {
     const appConfig = config.application || {
@@ -90,6 +101,45 @@ app.get('/saml/metadata', (req, res) => {
 
     res.set('Content-Type', 'application/xml');
     res.set('Content-Disposition', 'attachment; filename="metadata.xml"');
+    res.send(metadata);
+  } catch (error) {
+    console.error('Error generating SAML metadata:', error);
+    res.status(500).json({ error: 'Failed to generate metadata' });
+  }
+});
+
+// SAML metadata endpoint - IdP specific
+app.get('/saml/metadata/:idpName', (req, res) => {
+  try {
+    const idpName = decodeURIComponent(req.params.idpName);
+    const idp = config.identityProviders.find(
+      i => i.protocol === 'saml20' && i.name === idpName
+    );
+
+    if (!idp) {
+      return res.status(404).json({ error: 'Identity provider not found' });
+    }
+
+    // Build IdP-specific config for metadata
+    const appConfig = config.application || {
+      entityId: `${req.protocol}://${req.get('host')}/saml/metadata`,
+      baseUrl: `${req.protocol}://${req.get('host')}`
+    };
+
+    // Use IdP-specific settings if available
+    const idpConfig = {
+      entityId: idp.entityId || appConfig.entityId,
+      baseUrl: appConfig.baseUrl,
+      signSamlRequests: idp.signSamlRequests !== undefined ? idp.signSamlRequests : (appConfig.signSamlRequests || false),
+      samlSigningCertificate: idp.samlSigningCertificate || appConfig.samlSigningCertificate,
+      samlSigningPrivateKey: idp.samlSigningPrivateKey || appConfig.samlSigningPrivateKey
+    };
+
+    const metadata = generateSAMLMetadata(idpConfig);
+
+    res.set('Content-Type', 'application/xml');
+    const filename = `metadata-${idp.name.replace(/\s+/g, '-').toLowerCase()}.xml`;
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(metadata);
   } catch (error) {
     console.error('Error generating SAML metadata:', error);
