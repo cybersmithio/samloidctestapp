@@ -96,6 +96,9 @@ function displayConfig(config) {
         console.log(indentPrefix + '├─ Client ID:', idp.clientId);
         console.log(indentPrefix + '├─ Client Secret:', maskSensitiveValue('clientSecret', idp.clientSecret));
         console.log(indentPrefix + '├─ Scope:', idp.scope);
+        if (idp.insecureSkipCertificateVerification) {
+          console.log(indentPrefix + '├─ Certificate Verification:', '[DISABLED - INSECURE]');
+        }
         if (idp.userInfoUrl) {
           console.log(indentPrefix + '├─ UserInfo URL:', idp.userInfoUrl);
         }

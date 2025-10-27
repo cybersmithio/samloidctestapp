@@ -14,8 +14,17 @@ function createOidcRouter(config) {
   const buildFetchOptions = (idpConfig, baseOptions = {}) => {
     const options = { ...baseOptions };
 
+    // Check if certificate verification should be skipped (insecure, development only)
+    if (idpConfig.insecureSkipCertificateVerification) {
+      console.warn('[OIDC] WARNING: Certificate verification DISABLED for IdP:', idpConfig.name);
+      console.warn('[OIDC] This is insecure and should ONLY be used for development/testing!');
+
+      options.agent = new https.Agent({
+        rejectUnauthorized: false
+      });
+    }
     // If IdP has a custom certificate specified, create an HTTPS agent with custom CA
-    if (idpConfig.idpCertificate) {
+    else if (idpConfig.idpCertificate) {
       try {
         // Certificate path is relative to data/certificates/ directory
         const certPath = path.join(__dirname, '../../data/certificates', idpConfig.idpCertificate);
@@ -425,8 +434,17 @@ async function verifyJwt(token, idpConfig) {
       timeout: 10000 // 10 second timeout
     };
 
+    // Check if certificate verification should be skipped (insecure, development only)
+    if (idpConfig.insecureSkipCertificateVerification) {
+      console.warn('[JWT Verify] WARNING: Certificate verification DISABLED for JWKS endpoint');
+      console.warn('[JWT Verify] This is insecure and should ONLY be used for development/testing!');
+
+      jwksOptions.agent = new https.Agent({
+        rejectUnauthorized: false
+      });
+    }
     // If IdP has a custom certificate, add it to the JWKS client
-    if (idpConfig.idpCertificate) {
+    else if (idpConfig.idpCertificate) {
       try {
         // Certificate path is relative to data/certificates/ directory
         const certPath = path.join(__dirname, '../../data/certificates', idpConfig.idpCertificate);
