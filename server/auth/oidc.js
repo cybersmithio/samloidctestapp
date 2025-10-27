@@ -242,15 +242,25 @@ function createOidcRouter(config) {
             body: tokenBody.toString()
           });
 
+          console.log('[OIDC Callback] Fetch options:', {
+            method: fetchOptions.method,
+            headers: fetchOptions.headers,
+            hasAgent: !!fetchOptions.agent,
+            bodyLength: fetchOptions.body?.length
+          });
+
           tokenResponse = await fetch(idpConfig.tokenUrl, fetchOptions);
         } catch (fetchError) {
           console.error('[OIDC Callback] Fetch error during token exchange:', fetchError.message);
-          console.error('[OIDC Callback] Fetch error details:', {
+          console.error('[OIDC Callback] Full error object:', {
+            name: fetchError.name,
+            message: fetchError.message,
             code: fetchError.code,
             errno: fetchError.errno,
-            syscall: fetchError.syscall
+            syscall: fetchError.syscall,
+            cause: fetchError.cause?.message
           });
-          throw new Error(`Token exchange failed: ${fetchError.message} (possible network/DNS issue or invalid tokenUrl)`);
+          throw new Error(`Token exchange failed: ${fetchError.message}`);
         }
 
         if (!tokenResponse.ok) {
