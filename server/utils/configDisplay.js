@@ -100,7 +100,10 @@ function displayConfig(config) {
           console.log(indentPrefix + '├─ UserInfo URL:', idp.userInfoUrl);
         }
         if (idp.jwksUrl) {
-          console.log(indentPrefix + '└─ JWKS URL:', idp.jwksUrl);
+          console.log(indentPrefix + '├─ JWKS URL:', idp.jwksUrl);
+        }
+        if (idp.idpCertificate) {
+          console.log(indentPrefix + '└─ IdP Certificate:', idp.idpCertificate);
         }
       }
     });

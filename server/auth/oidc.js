@@ -2,10 +2,39 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 const crypto = require('crypto');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const configLoader = require('../utils/configLoader');
 
 function createOidcRouter(config) {
   const router = express.Router();
+
+  // Helper function to build fetch options with custom CA certificate if provided
+  const buildFetchOptions = (idpConfig, baseOptions = {}) => {
+    const options = { ...baseOptions };
+
+    // If IdP has a custom certificate specified, create an HTTPS agent with custom CA
+    if (idpConfig.idpCertificate) {
+      try {
+        const certPath = path.join(__dirname, '../../data', idpConfig.idpCertificate);
+        const certContent = fs.readFileSync(certPath, 'utf8');
+
+        // Create custom HTTPS agent with the CA certificate
+        options.agent = new https.Agent({
+          ca: certContent,
+          rejectUnauthorized: true
+        });
+
+        console.log('[OIDC] Using custom CA certificate for IdP:', idpConfig.idpCertificate);
+      } catch (error) {
+        console.warn('[OIDC] Could not load IdP certificate:', idpConfig.idpCertificate, error.message);
+        // Continue without custom cert - will fail if certificate is invalid
+      }
+    }
+
+    return options;
+  };
 
   // Helper function to build absolute URLs from config
   const buildAbsoluteUrl = (path = '/') => {
@@ -186,26 +215,55 @@ function createOidcRouter(config) {
         const baseUrl = config.application?.baseUrl || buildAbsoluteUrl('');
         const callbackUrl = `${baseUrl}/auth/oidc/callback`;
 
-        const tokenResponse = await fetch(idpConfig.tokenUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: callbackUrl,
-            client_id: idpConfig.clientId,
-            client_secret: idpConfig.clientSecret
-          })
+        // Debug: Log token exchange details
+        const tokenBody = new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code,
+          redirect_uri: callbackUrl,
+          client_id: idpConfig.clientId,
+          client_secret: idpConfig.clientSecret
         });
+
+        console.log('[OIDC Callback] Token exchange request:', {
+          tokenUrl: idpConfig.tokenUrl,
+          redirectUri: callbackUrl,
+          clientId: idpConfig.clientId,
+          code: code.substring(0, 20) + '...' // Log first 20 chars only
+        });
+
+        let tokenResponse;
+        try {
+          const fetchOptions = buildFetchOptions(idpConfig, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: tokenBody.toString()
+          });
+
+          tokenResponse = await fetch(idpConfig.tokenUrl, fetchOptions);
+        } catch (fetchError) {
+          console.error('[OIDC Callback] Fetch error during token exchange:', fetchError.message);
+          console.error('[OIDC Callback] Fetch error details:', {
+            code: fetchError.code,
+            errno: fetchError.errno,
+            syscall: fetchError.syscall
+          });
+          throw new Error(`Token exchange failed: ${fetchError.message} (possible network/DNS issue or invalid tokenUrl)`);
+        }
 
         if (!tokenResponse.ok) {
           const errorText = await tokenResponse.text();
+          console.error('[OIDC Callback] Token endpoint returned error:', {
+            status: tokenResponse.status,
+            statusText: tokenResponse.statusText,
+            body: errorText.substring(0, 200)
+          });
           throw new Error(`Token exchange failed: ${errorText}`);
         }
 
         const tokens = await tokenResponse.json();
+        console.log('[OIDC Callback] Token exchange successful, received tokens');
         // Tokens from token endpoint take precedence
         finalIdToken = tokens.id_token || finalIdToken;
         finalAccessToken = tokens.access_token || finalAccessToken;
@@ -348,12 +406,31 @@ async function verifyJwt(token, idpConfig) {
 
     console.log('[JWT Verify] Fetching JWKS from:', jwksUri);
 
-    const client = jwksClient({
+    // Build JWKS client options with custom CA if provided
+    const jwksOptions = {
       jwksUri: jwksUri,
       cache: true,
       cacheMaxAge: 86400000, // 24 hours
       timeout: 10000 // 10 second timeout
-    });
+    };
+
+    // If IdP has a custom certificate, add it to the JWKS client
+    if (idpConfig.idpCertificate) {
+      try {
+        const certPath = path.join(__dirname, '../../data', idpConfig.idpCertificate);
+        const certContent = fs.readFileSync(certPath, 'utf8');
+        // jwks-rsa supports agent configuration
+        jwksOptions.agent = new https.Agent({
+          ca: certContent,
+          rejectUnauthorized: true
+        });
+        console.log('[JWT Verify] Using custom CA certificate for JWKS');
+      } catch (error) {
+        console.warn('[JWT Verify] Could not load IdP certificate for JWKS:', error.message);
+      }
+    }
+
+    const client = jwksClient(jwksOptions);
 
     // Get signing key
     client.getSigningKey(decodedHeader.header.kid, (err, key) => {

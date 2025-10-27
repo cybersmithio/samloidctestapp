@@ -79,6 +79,11 @@ function validateOidcConfig(idp, index) {
     idp.responseType = 'code';
   }
 
+  // Optional: idpCertificate field for custom CA certificates
+  // If IdP uses self-signed or custom certificates, specify the path to the certificate file
+  // relative to data/ directory. For example: "certificates/idp-custom-ca.pem"
+  // This certificate will be used for HTTPS connections to the IdP's token and JWKS endpoints
+
   // Validate response type
   const validResponseTypes = [
     'code',                    // Authorization Code Flow

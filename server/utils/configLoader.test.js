@@ -42,7 +42,11 @@ describe('configLoader', () => {
 
       const config = configLoader.loadConfig();
 
-      expect(config).toEqual(mockConfig);
+      // The loader adds default authNContextClassRef and responseType
+      const expectedConfig = JSON.parse(JSON.stringify(mockConfig));
+      expectedConfig.identityProviders[0].authNContextClassRef = 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport';
+
+      expect(config).toEqual(expectedConfig);
       expect(fs.readFileSync).toHaveBeenCalledWith(
         expect.stringContaining('config.json'),
         'utf8'
