@@ -37,7 +37,7 @@ cp /path/to/idp-ca-cert.pem data/certificates/
 
 ### Step 3: Update Configuration
 
-Add the `idpCertificate` field to your OIDC IdP configuration in `data/config.json`:
+Add the `idpCertificate` field to your OIDC IdP configuration in `data/config.json`. Specify just the certificate filename (it will be looked up in `data/certificates/`):
 
 ```json
 {
@@ -56,13 +56,13 @@ Add the `idpCertificate` field to your OIDC IdP configuration in `data/config.js
       "clientId": "your-client-id",
       "clientSecret": "your-client-secret",
       "scope": "openid profile email",
-      "idpCertificate": "certificates/idp-ca-cert.pem"
+      "idpCertificate": "idp-ca-cert.pem"
     }
   ]
 }
 ```
 
-**Note:** The `idpCertificate` path is relative to the `data/` directory.
+**Note:** Specify just the filename - the certificate is automatically looked up in the `data/certificates/` directory.
 
 ## How It Works
 
@@ -100,7 +100,7 @@ Update `data/config.json`:
 {
   "protocol": "oidc",
   "name": "Test IdP with Self-Signed Cert",
-  "idpCertificate": "certificates/idp-cert.pem",
+  "idpCertificate": "idp-cert.pem",
   ...
 }
 ```
@@ -113,7 +113,7 @@ npm run start:prod
 
 You should see in the logs:
 ```
-[OIDC] Using custom CA certificate for IdP: certificates/idp-cert.pem
+[OIDC] Using custom CA certificate for IdP: idp-cert.pem
 ```
 
 ### 5. Test the Authorization Flow
@@ -134,19 +134,19 @@ cat idp-leaf.pem idp-intermediate.pem idp-root.pem > idp-chain.pem
 
 Then configure:
 ```json
-"idpCertificate": "certificates/idp-chain.pem"
+"idpCertificate": "idp-chain.pem"
 ```
 
 ## Troubleshooting
 
 ### Certificate Not Found
 
-**Error:** `Could not load IdP certificate: certificates/my-cert.pem`
+**Error:** `Could not load IdP certificate: my-cert.pem`
 
 **Solution:**
 - Verify the file exists in `data/certificates/`
-- Check the filename in the configuration matches exactly
-- Paths are relative to the `data/` directory
+- Check the filename in the configuration matches exactly (case-sensitive)
+- Only specify the filename, not a path
 
 ### Certificate Verification Still Fails
 
@@ -203,13 +203,13 @@ You can configure multiple OIDC IdPs, each with their own self-signed certificat
     {
       "protocol": "oidc",
       "name": "IdP 1 - Self-Signed",
-      "idpCertificate": "certificates/idp1-cert.pem",
+      "idpCertificate": "idp1-cert.pem",
       ...
     },
     {
       "protocol": "oidc",
       "name": "IdP 2 - Self-Signed",
-      "idpCertificate": "certificates/idp2-cert.pem",
+      "idpCertificate": "idp2-cert.pem",
       ...
     }
   ]

@@ -17,7 +17,8 @@ function createOidcRouter(config) {
     // If IdP has a custom certificate specified, create an HTTPS agent with custom CA
     if (idpConfig.idpCertificate) {
       try {
-        const certPath = path.join(__dirname, '../../data', idpConfig.idpCertificate);
+        // Certificate path is relative to data/certificates/ directory
+        const certPath = path.join(__dirname, '../../data/certificates', idpConfig.idpCertificate);
         const certContent = fs.readFileSync(certPath, 'utf8');
 
         // Create custom HTTPS agent with the CA certificate
@@ -417,7 +418,8 @@ async function verifyJwt(token, idpConfig) {
     // If IdP has a custom certificate, add it to the JWKS client
     if (idpConfig.idpCertificate) {
       try {
-        const certPath = path.join(__dirname, '../../data', idpConfig.idpCertificate);
+        // Certificate path is relative to data/certificates/ directory
+        const certPath = path.join(__dirname, '../../data/certificates', idpConfig.idpCertificate);
         const certContent = fs.readFileSync(certPath, 'utf8');
         // jwks-rsa supports agent configuration
         jwksOptions.agent = new https.Agent({
