@@ -1,6 +1,12 @@
 # SAML/OIDC Test Application
 This is an application used to test SAML and OIDC authentication.  Code has been created with the assistance of an AI coding agent.
 
+# Quickstart
+The app has been packaged into a container image that can be found at [Docker hub](https://hub.docker.com/r/cybersmithio/saml-oidc-test-app).
+
+Use that package along with a config.json based on config.example.json (found in this project).
+
+
 # Requirements
 * An application that has a main page that displays login buttons for a user to log in using one of the configure identify providers.
 * The application can use React javascript framework.

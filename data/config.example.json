@@ -1,10 +1,10 @@
 {
   "application": {
-    "hostname": "your-app-domain.com",
+    "hostname": "workstation.local",
     "port": 3001,
     "publicPort": 443,
-    "entityId": "https://your-app-domain.com/saml/metadata",
-    "baseUrl": "https://your-app-domain.com",
+    "entityId": "https://workstation.local/saml/metadata",
+    "baseUrl": "https://workstation.local",
     "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
     "samlSigningPrivateKey": "certsAndKeys/sp-key.pem",
     "signSamlRequests": true,
@@ -16,28 +16,61 @@
   "identityProviders": [
     {
       "protocol": "saml20",
-      "name": "Example SAML IdP",
-      "issuerUrl": "https://idp.example.com",
+      "name": "Example SAML IdP with RP using unique entityId and signed SAML requests",
+      "issuerUrl": "https://idp.example.local",
       "binding": "redirect",
-      "loginUrl": "https://idp.example.com/sso/saml",
-      "logoutUrl": "https://idp.example.com/sso/logout",
+      "loginUrl": "https://idp.example.local/sso/saml",
+      "logoutUrl": "https://idp.example.local/sso/logout",
       "certificate": "saml-idp-cert.pem",
-      "authNContextClassRef": "urn:oasis:names:tc:SAML:1.0:am:password"
+      "authNContextClassRef": "urn:oasis:names:tc:SAML:1.0:am:password",
+      "forceAuthn": false,
+      "entityId": "samltestapp1",
+      "samlSigningCertificate": "certsAndKeys/sp-cert.pem",
+      "samlSigningPrivateKey": "certsAndKeys/sp-key.pem",
+      "signSamlRequests": true
+    },
+    {
+      "protocol": "saml20",
+      "name": "Example SAML IdP with RP using globally defined entityId and unsigned SAML requests",
+      "issuerUrl": "https://idp.example.local",
+      "binding": "redirect",
+      "loginUrl": "https://idp.example.local/sso/saml",
+      "logoutUrl": "https://idp.example.local/sso/logout",
+      "certificate": "saml-idp-cert.pem",
+      "authNContextClassRef": "urn:oasis:names:tc:SAML:1.0:am:password",
+      "forceAuthn": false,
+      "signSamlRequests": false
+    },    
+    {
+      "protocol": "oidc",
+      "name": "Example OIDC IdP that uses implicit flow",
+      "responseType": "id_token",
+      "tenantUrl": "https://login.example.local/tenant-id",
+      "issuerUrl": "https://login.example.local/tenant-id/v2.0",
+      "authorizationUrl": "https://login.example.local/tenant-id/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.example.local/tenant-id/oauth2/v2.0/token",
+      "userInfoUrl": "https://graph.example.local/oidc/userinfo",
+      "metadataUrl": "https://login.example.local/tenant-id/v2.0/.well-known/openid-configuration",
+      "jwksUrl": "https://login.example.local/tenant-id/discovery/v2.0/keys",
+      "clientId": "your-client-id1",
+      "clientSecret": "your-client-secret",
+      "scope": "openid profile email"
     },
     {
       "protocol": "oidc",
-      "name": "Example OIDC IdP",
+      "name": "Example OIDC IdP that uses authorization code flow and does not validate TLS cert of IdP token URL",
       "responseType": "code",
-      "tenantUrl": "https://login.example.com/tenant-id",
-      "issuerUrl": "https://login.example.com/tenant-id/v2.0",
-      "authorizationUrl": "https://login.example.com/tenant-id/oauth2/v2.0/authorize",
-      "tokenUrl": "https://login.example.com/tenant-id/oauth2/v2.0/token",
-      "userInfoUrl": "https://graph.example.com/oidc/userinfo",
-      "metadataUrl": "https://login.example.com/tenant-id/v2.0/.well-known/openid-configuration",
-      "jwksUrl": "https://login.example.com/tenant-id/discovery/v2.0/keys",
-      "clientId": "your-client-id",
+      "tenantUrl": "https://login.example.local/tenant-id",
+      "issuerUrl": "https://login.example.local/tenant-id/v2.0",
+      "authorizationUrl": "https://login.example.local/tenant-id/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.example.local/tenant-id/oauth2/v2.0/token",
+      "userInfoUrl": "https://graph.example.local/oidc/userinfo",
+      "metadataUrl": "https://login.example.local/tenant-id/v2.0/.well-known/openid-configuration",
+      "jwksUrl": "https://login.example.local/tenant-id/discovery/v2.0/keys",
+      "clientId": "your-client-id2",
       "clientSecret": "your-client-secret",
-      "scope": "openid profile email"
-    }
+      "scope": "openid profile email",
+      "insecureSkipCertificateVerification": true
+    }    
   ]
 }
