@@ -66,8 +66,8 @@
       "userInfoUrl": "https://cybersmith.verify.ibm.com/oauth2/userinfo",
       "metadataUrl": "https://cybersmith.verify.ibm.com/oauth2/.well-known/openid-configuration",
       "jwksUrl": "https://cybersmith.verify.ibm.com/oauth2/jwks",
-      "clientId": "8d005df8-5f44-44b3-a3a7-9383c0cd75ec",
-      "clientSecret": "eHCXWcC4x2v6JL1W3Ax4",
+      "clientId": "*******************************",
+      "clientSecret": "*******************************",
       "scope": "openid profile email"
     },
     {
@@ -81,8 +81,8 @@
       "userInfoUrl": "https://cybersmith.verify.ibm.com/oauth2/userinfo",
       "metadataUrl": "https://cybersmith.verify.ibm.com/oauth2/.well-known/openid-configuration",
       "jwksUrl": "https://cybersmith.verify.ibm.com/oauth2/jwks",
-      "clientId": "a31dc1e0-2e1c-4ca9-8a1c-3f0f34c904c6",
-      "clientSecret": "OHGKocwQ4IEn8V8YUrFt",
+      "clientId": "*******************************",
+      "clientSecret": "*******************************",
       "scope": "openid profile email",
       "insecureSkipCertificateVerification": true
     }
