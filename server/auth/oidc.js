@@ -53,6 +53,8 @@ function createOidcRouter(config) {
 
       req.on('error', reject);
       if (options.body) {
+        const bodyStr = String(options.body);
+        console.log('[makeRequest] Writing body to request:', bodyStr.substring(0, 200));
         req.write(options.body);
       }
       req.end();
