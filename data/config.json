@@ -57,7 +57,7 @@
     },    
     {
       "protocol": "oidc",
-      "name": "OIDC Test App 1",
+      "name": "OIDC Test App 1 (Implicit)",
       "responseType": "id_token",
       "tenantUrl": "https://cybersmith.verify.ibm.com",
       "issuerUrl": "https://cybersmith.verify.ibm.com/oauth2",
@@ -69,6 +69,23 @@
       "clientId": "8d005df8-5f44-44b3-a3a7-9383c0cd75ec",
       "clientSecret": "eHCXWcC4x2v6JL1W3Ax4",
       "scope": "openid profile email"
+    },
+    {
+      "protocol": "oidc",
+      "name": "OIDC Test App 2 (Auth code)",
+      "responseType": "code",
+      "tenantUrl": "https://cybersmith.verify.ibm.com",
+      "issuerUrl": "https://cybersmith.verify.ibm.com/oauth2",
+      "authorizationUrl": "https://cybersmith.verify.ibm.com/oauth2/authorize",
+      "tokenUrl": "https://cybersmith.verify.ibm.com/oauth2/token",
+      "userInfoUrl": "https://cybersmith.verify.ibm.com/oauth2/userinfo",
+      "metadataUrl": "https://cybersmith.verify.ibm.com/oauth2/.well-known/openid-configuration",
+      "jwksUrl": "https://cybersmith.verify.ibm.com/oauth2/jwks",
+      "clientId": "a31dc1e0-2e1c-4ca9-8a1c-3f0f34c904c6",
+      "clientSecret": "OHGKocwQ4IEn8V8YUrFt",
+      "scope": "openid profile email",
+      "insecureSkipCertificateVerification": true
     }
+
   ]
 }

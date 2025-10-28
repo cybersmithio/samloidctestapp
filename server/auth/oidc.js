@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 const crypto = require('crypto');
 const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 const fs = require('fs');
 const path = require('path');
 const configLoader = require('../utils/configLoader');
@@ -10,8 +12,55 @@ const configLoader = require('../utils/configLoader');
 function createOidcRouter(config) {
   const router = express.Router();
 
-  // Helper function to build fetch options with custom CA certificate if provided
-  const buildFetchOptions = (idpConfig, baseOptions = {}) => {
+  // Helper function to make HTTP/HTTPS requests with custom certificate handling
+  // Uses native http/https modules instead of fetch to properly handle rejectUnauthorized
+  const makeRequest = (urlString, options) => {
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(urlString);
+      const protocol = parsedUrl.protocol === 'https:' ? https : http;
+
+      const requestOptions = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port,
+        path: parsedUrl.pathname + parsedUrl.search,
+        method: options.method || 'GET',
+        headers: options.headers || {},
+        agent: options.agent
+      };
+
+      // Set Content-Length header if there's a body
+      // This is important for POST requests with form-encoded data
+      if (options.body) {
+        const bodyBuffer = Buffer.isBuffer(options.body) ? options.body : Buffer.from(String(options.body));
+        requestOptions.headers['Content-Length'] = bodyBuffer.length;
+      }
+
+      const req = protocol.request(requestOptions, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          // Return a Response-like object compatible with fetch API
+          resolve({
+            status: res.statusCode,
+            statusCode: res.statusCode,
+            ok: res.statusCode >= 200 && res.statusCode < 300,
+            text: () => Promise.resolve(data),
+            json: () => Promise.resolve(JSON.parse(data)),
+            headers: res.headers
+          });
+        });
+      });
+
+      req.on('error', reject);
+      if (options.body) {
+        req.write(options.body);
+      }
+      req.end();
+    });
+  };
+
+  // Helper function to build request options with custom CA certificate if provided
+  const buildRequestOptions = (idpConfig, baseOptions = {}) => {
     const options = { ...baseOptions };
 
     // Check if certificate verification should be skipped (insecure, development only)
@@ -19,18 +68,19 @@ function createOidcRouter(config) {
       console.warn('[OIDC] WARNING: Certificate verification DISABLED for IdP:', idpConfig.name);
       console.warn('[OIDC] This is insecure and should ONLY be used for development/testing!');
 
+      // Create HTTPS agent with disabled certificate verification
       options.agent = new https.Agent({
         rejectUnauthorized: false
       });
     }
-    // If IdP has a custom certificate specified, create an HTTPS agent with custom CA
+    // If IdP has a custom certificate specified, use custom CA
     else if (idpConfig.idpCertificate) {
       try {
         // Certificate path is relative to data/certificates/ directory
         const certPath = path.join(__dirname, '../../data/certificates', idpConfig.idpCertificate);
         const certContent = fs.readFileSync(certPath, 'utf8');
 
-        // Create custom HTTPS agent with the CA certificate
+        // Create HTTPS agent with custom CA certificate
         options.agent = new https.Agent({
           ca: certContent,
           rejectUnauthorized: true
@@ -243,7 +293,7 @@ function createOidcRouter(config) {
 
         let tokenResponse;
         try {
-          const fetchOptions = buildFetchOptions(idpConfig, {
+          const requestOptions = buildRequestOptions(idpConfig, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded'
@@ -251,14 +301,15 @@ function createOidcRouter(config) {
             body: tokenBody.toString()
           });
 
-          console.log('[OIDC Callback] Fetch options:', {
-            method: fetchOptions.method,
-            headers: fetchOptions.headers,
-            hasAgent: !!fetchOptions.agent,
-            bodyLength: fetchOptions.body?.length
+          console.log('[OIDC Callback] Request options:', {
+            method: requestOptions.method,
+            headers: requestOptions.headers,
+            hasAgent: !!requestOptions.agent,
+            bodyLength: requestOptions.body?.length
           });
 
-          tokenResponse = await fetch(idpConfig.tokenUrl, fetchOptions);
+          // Use makeRequest instead of fetch to properly handle certificate verification
+          tokenResponse = await makeRequest(idpConfig.tokenUrl, requestOptions);
         } catch (fetchError) {
           console.error('[OIDC Callback] Fetch error during token exchange:', fetchError.message);
           console.error('[OIDC Callback] Full error object:', {
@@ -338,11 +389,14 @@ function createOidcRouter(config) {
       // Fetch user info from userinfo endpoint if available and we have an access token
       if (idpConfig.userInfoUrl && finalAccessToken) {
         try {
-          const userInfoResponse = await fetch(idpConfig.userInfoUrl, {
+          const userInfoRequestOptions = buildRequestOptions(idpConfig, {
+            method: 'GET',
             headers: {
               'Authorization': `Bearer ${finalAccessToken}`
             }
           });
+
+          const userInfoResponse = await makeRequest(idpConfig.userInfoUrl, userInfoRequestOptions);
 
           if (userInfoResponse.ok) {
             const additionalUserInfo = await userInfoResponse.json();
